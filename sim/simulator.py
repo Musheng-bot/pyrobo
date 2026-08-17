@@ -1,3 +1,4 @@
+import math
 import time
 from collections.abc import Callable
 
@@ -152,16 +153,37 @@ class Simulator:
                 color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
                 pygame.draw.rect(screen, color, (column * cell, row * cell, cell, cell))
 
-        x, y, _ = self.robot.pose
-        column, row = world_map.world_to_grid(x, y)
-        if 0 <= row < height and 0 <= column < width:
-            center = (column * cell + cell // 2, row * cell + cell // 2)
-            pygame.draw.circle(screen, (220, 55, 55), center, cell // 3)
+        x, y, yaw = self.robot.pose
+        map_width_m, map_height_m = world_map.size_meters
+        screen_x = (x - world_map.origin[0]) / map_width_m * width * cell
+        screen_y = height * cell - (y - world_map.origin[1]) / map_height_m * height * cell
+        if 0 <= screen_x < width * cell and 0 <= screen_y < height * cell:
+            center = (round(screen_x), round(screen_y))
+            pygame.draw.circle(screen, (220, 55, 55), center, max(6, cell // 4))
+            heading_length = cell * 0.45
+            heading_end = (
+                round(center[0] + heading_length * math.cos(yaw)),
+                round(center[1] - heading_length * math.sin(yaw)),
+            )
+            pygame.draw.line(screen, (120, 20, 20), center, heading_end, 3)
 
+        # Keep grid lines as a low-contrast visual aid instead of the main map.
+        grid_layer = pygame.Surface((width * cell, height * cell), pygame.SRCALPHA)
         for column in range(width + 1):
-            pygame.draw.line(screen, (190, 190, 190), (column * cell, 0), (column * cell, height * cell))
+            pygame.draw.line(
+                grid_layer,
+                (150, 150, 150, 55),
+                (column * cell, 0),
+                (column * cell, height * cell),
+            )
         for row in range(height + 1):
-            pygame.draw.line(screen, (190, 190, 190), (0, row * cell), (width * cell, row * cell))
+            pygame.draw.line(
+                grid_layer,
+                (150, 150, 150, 55),
+                (0, row * cell),
+                (width * cell, row * cell),
+            )
+        screen.blit(grid_layer, (0, 0))
 
         panel_x = width * cell
         pygame.draw.rect(screen, (35, 40, 48), (panel_x, 0, 280, screen.get_height()))
