@@ -7,11 +7,10 @@ MapInput: TypeAlias = np.ndarray | str | Path
 
 
 class Map:
-    """A 2D occupancy map with a real-world scale.
+    """带现实尺寸信息的二维黑白栅格地图。
 
-    ``resolution`` is metres per pixel. ``origin`` is the world coordinate of
-    the bottom-left pixel. World coordinates use x-right/y-up; image rows are
-    flipped vertically when converting to world coordinates.
+    白色区域为可行区域，黑色区域为障碍物。``resolution`` 是米/像素，
+    ``origin`` 是图片左下角像素对应的世界坐标。世界坐标 x 向右、y 向上。
     """
 
     def __init__(
@@ -21,6 +20,12 @@ class Map:
         origin: tuple[float, float] = (0.0, 0.0),
         threshold: int = 128,
     ):
+        """创建地图。
+
+        ``source`` 可以是 ``np.ndarray``、PGM/PNG 图片路径；灰度值大于等于
+        ``threshold`` 的像素会被视为可行区域。``data[row, column]`` 为
+        ``True`` 表示该像素可行。
+        """
         if resolution <= 0:
             raise ValueError("resolution must be greater than zero")
         if not 0 <= threshold <= 255:
@@ -73,16 +78,17 @@ class Map:
 
     @property
     def shape(self) -> tuple[int, int]:
+        """返回地图数组形状 ``(height, width)``，单位为像素。"""
         return self.data.shape
 
     @property
     def size_meters(self) -> tuple[float, float]:
-        """Return map size as ``(width, height)`` in metres."""
+        """返回地图现实尺寸 ``(width, height)``，单位为米。"""
         height, width = self.data.shape
         return width * self.resolution, height * self.resolution
 
     def world_to_grid(self, x: float, y: float) -> tuple[int, int]:
-        """Convert world metres to ``(column, row)`` image indices."""
+        """将世界坐标米转换为图片索引 ``(column, row)``。"""
         height, _ = self.data.shape
         column = int(np.floor((x - self.origin[0]) / self.resolution))
         from_bottom = int(np.floor((y - self.origin[1]) / self.resolution))
@@ -90,7 +96,7 @@ class Map:
         return column, row
 
     def grid_to_world(self, column: int, row: int) -> tuple[float, float]:
-        """Return the world coordinate of a grid cell's center."""
+        """返回栅格中心的世界坐标 ``(x, y)``，单位为米。"""
         height, width = self.data.shape
         if not 0 <= row < height or not 0 <= column < width:
             raise IndexError("grid coordinate is outside the map")
@@ -99,12 +105,16 @@ class Map:
         return x, y
 
     def is_free(self, x: float, y: float) -> bool:
-        """Return whether the world coordinate ``(x, y)`` is free."""
+        """查询世界坐标 ``(x, y)`` 所在的栅格是否可行。越界返回 False。"""
         column, row = self.world_to_grid(x, y)
         return self._is_free_cell(column, row)
 
     def is_free_circle(self, x: float, y: float, radius: float) -> bool:
-        """Return whether a circle at ``(x, y)`` fits entirely in free cells."""
+        """查询圆形机器人是否能放置在 ``(x, y)``。
+
+        ``radius`` 单位为米；只要圆形范围接触黑色区域或地图边界，就返回
+        ``False``。该函数用于带半径的机器人碰撞检测。
+        """
         if radius < 0:
             raise ValueError("radius must not be negative")
 
@@ -139,5 +149,6 @@ class Map:
         return True
 
     def _is_free_cell(self, column: int, row: int) -> bool:
+        """查询图片索引对应的栅格是否可行；越界返回 False。"""
         height, width = self.data.shape
         return 0 <= row < height and 0 <= column < width and bool(self.data[row, column])

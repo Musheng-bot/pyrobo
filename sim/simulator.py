@@ -11,10 +11,10 @@ ControlCallback = Callable[["Simulator"], None]
 
 
 class Simulator:
-    """Simulation environment exposed to upper-level control software.
+    """提供给上层控制软件使用的仿真环境。
 
-    The optional pygame renderer is owned by this class. Upper-level code only
-    sets controls and reads feedback through the public methods.
+    pygame 窗口、地图、机器人和控制器均由该类管理。上层软件主要通过
+    ``set_control``、``get_feedback``、``get_pose`` 和 ``step`` 交互。
     """
 
     def __init__(
@@ -30,6 +30,11 @@ class Simulator:
         render: bool = True,
         window_scale: int = 48,
     ):
+        """创建仿真环境。
+
+        ``map_data`` 可以是 ``Map``、``np.ndarray`` 或地图文件路径；
+        ``map_resolution`` 为米/像素，``map_origin`` 为地图左下角世界坐标。
+        """
         if time_step <= 0:
             raise ValueError("time_step must be greater than zero")
         if window_scale <= 0:
@@ -60,17 +65,19 @@ class Simulator:
         self._clock = None
 
     def set_control(self, speed: float, omega: float) -> None:
-        """Set expected linear and angular velocity."""
+        """设置期望线速度和角速度，单位分别为 m/s 和 rad/s。"""
         self.controller.set_control(speed, omega)
 
     def get_control(self) -> tuple[float, float]:
+        """获取当前设置的期望 ``(speed, omega)``。"""
         return self.controller.get_control()
 
     def get_feedback(self) -> tuple[float, float]:
-        """Get measured ``(speed, omega)`` from the last simulation tick."""
+        """获取最近一个仿真周期的实际 ``(speed, omega)`` 反馈。"""
         return self.controller.get_feedback()
 
     def get_pose(self) -> tuple[float, float, float]:
+        """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
         return self.robot.pose
 
     def get_manual_control(
@@ -78,11 +85,10 @@ class Simulator:
         speed: float = 0.1,
         omega: float = 1.5,
     ) -> tuple[float, float]:
-        """Read pygame keyboard input as ``(speed, omega)``.
+        """读取 pygame 键盘输入并返回 ``(speed, omega)``。
 
-        This is intended for a manual upper-level control mode. The simulator
-        still only returns the input; the caller must pass it to
-        :meth:`set_control`.
+        该函数只读取输入，不会自动设置控制量；调用方仍需把返回值传给
+        :meth:`set_control`。方向键对应前进、后退、左转和右转。
         """
         if self._pygame is None:
             raise RuntimeError("manual control requires the pygame renderer")
@@ -92,18 +98,17 @@ class Simulator:
         return linear_speed, angular_speed
 
     def step(self) -> tuple[float, float]:
-        """Advance one simulation tick and return measured velocity."""
+        """推进一个仿真周期，并返回实际反馈 ``(speed, omega)``。"""
         can_move = None if self.map is None else lambda pose: self.map.is_free_circle(
             pose[0], pose[1], self.robot.radius
         )
         return self.controller.step(can_move)
 
     def run(self, callback: ControlCallback | None = None, duration: float | None = None) -> None:
-        """Run the environment in the current thread.
+        """在当前线程运行仿真环境。
 
-        ``callback`` is called after every tick. It can read the latest
-        feedback and set the command for the next tick. With rendering enabled,
-        closing the pygame window stops the environment.
+        每个周期结束后调用一次 ``callback(simulator)``。回调中可以读取本周期
+        反馈，并设置下一周期控制量。开启渲染时，关闭 pygame 窗口会停止仿真。
         """
         if duration is not None and duration < 0:
             raise ValueError("duration must be non-negative or None")
@@ -136,6 +141,7 @@ class Simulator:
                 self._close_renderer()
 
     def stop(self) -> None:
+        """停止持续运行的仿真循环。"""
         self.is_running = False
 
     def _init_renderer(self) -> None:
