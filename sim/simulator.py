@@ -64,9 +64,8 @@ class Simulator:
         self._screen = None
         self._font = None
         self._clock = None
-        self._path: list[WorldPoint] = []
+        self._display_path: list[WorldPoint] = []
         self._goal: tuple[float, float, float] | None = None
-        self._path_planner = None
         self._manual_keys: set[int] = set()
 
     def set_control(self, speed: float, omega: float) -> None:
@@ -86,14 +85,15 @@ class Simulator:
         return self.robot.pose
 
     def set_goal(self, goal: tuple[float, float] | tuple[float, float, float]) -> None:
-        """设置米制世界坐标目标点，pygame 单击地图也会调用此接口。"""
+        """设置米制世界坐标目标点，pygame 单击地图也会调用此接口。
+
+        目标点只保存在 Simulator 中，由上层导航回调通过 ``get_goal``
+        主动读取和处理。
+        """
         if len(goal) not in (2, 3):
             raise ValueError("goal must contain (x, y) or (x, y, yaw)")
         yaw = float(goal[2]) if len(goal) == 3 else 0.0
         self._goal = (float(goal[0]), float(goal[1]), yaw)
-        if self._path_planner is not None:
-            self._path_planner.set_goal(self._goal)
-            self.refresh_path()
 
     def get_goal(self) -> tuple[float, float, float] | None:
         """获取当前目标点；没有设置目标时返回 ``None``。"""
@@ -102,31 +102,19 @@ class Simulator:
     def clear_goal(self) -> None:
         """清除目标点和当前显示路径。"""
         self._goal = None
-        self._path = []
+        self._display_path = []
 
-    def set_path(self, path: Iterable[WorldPoint]) -> None:
-        """接收 PathPlanner 生成的世界坐标路径并显示。"""
-        self._path = [(float(point[0]), float(point[1])) for point in path]
+    def set_display_path(self, path: Iterable[WorldPoint]) -> None:
+        """设置要在 pygame 中显示的世界坐标路径。
 
-    def get_path(self) -> list[WorldPoint]:
+        路径可以来自任意导航算法，不要求继承或绑定 PathPlanner；
+        每个点格式为 ``(x, y)``，单位为米。
+        """
+        self._display_path = [(float(point[0]), float(point[1])) for point in path]
+
+    def get_display_path(self) -> list[WorldPoint]:
         """获取当前显示的世界坐标路径副本。"""
-        return list(self._path)
-
-    def set_path_planner(self, planner) -> None:
-        """绑定提供 ``set_goal`` 和 ``plan`` 方法的 PathPlanner。"""
-        if not hasattr(planner, "plan") or not hasattr(planner, "set_goal"):
-            raise TypeError("planner must provide plan() and set_goal()")
-        self._path_planner = planner
-        if self._goal is not None:
-            planner.set_goal(self._goal)
-            self.refresh_path()
-
-    def refresh_path(self) -> list[WorldPoint]:
-        """重新调用 PathPlanner 并更新显示路径。"""
-        if self._path_planner is None:
-            return self.get_path()
-        self.set_path(self._path_planner.plan())
-        return self.get_path()
+        return list(self._display_path)
 
     def get_manual_control(
         self,
@@ -268,15 +256,15 @@ class Simulator:
                 color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
                 pygame.draw.rect(screen, color, (column * cell, row * cell, cell, cell))
 
-        if len(self._path) >= 2:
+        if len(self._display_path) >= 2:
             pygame.draw.lines(
                 screen,
                 (40, 120, 230),
                 False,
-                [self._world_to_screen(point) for point in self._path],
+                [self._world_to_screen(point) for point in self._display_path],
                 4,
             )
-        for point in self._path:
+        for point in self._display_path:
             pygame.draw.circle(screen, (40, 120, 230), self._world_to_screen(point), 4)
 
         if self._goal is not None:
@@ -333,7 +321,7 @@ class Simulator:
             f"command w: {expected_omega:.3f} rad/s",
             f"feedback v: {feedback_speed:.3f} m/s",
             f"feedback w: {feedback_omega:.3f} rad/s",
-            f"path points: {len(self._path)}",
+            f"path points: {len(self._display_path)}",
             "",
             "left click / G: set goal",
             "ESC  close",
