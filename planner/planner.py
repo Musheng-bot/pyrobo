@@ -1,0 +1,43 @@
+from sim.map import Map
+from sim.simulator import Simulator
+
+
+class Planner:
+    def __init__(self, robo_map: Map, sim: Simulator) -> None:
+        self.map = robo_map
+        self.sim = sim
+
+    @property
+    def robot_pose(self) -> tuple[float, float, float]:
+        return self.sim.robot.pose
+
+
+class PathPlanner(Planner):
+    def __init__(self, robo_map: Map, sim: Simulator) -> None:
+        super().__init__(robo_map, sim)
+        self.goal: tuple[float, float, float] = self.sim.robot.pose
+
+    def set_goal(self, goal: tuple[float, float, float]) -> None:
+        """设置目标世界位姿，通常由 Simulator 的地图点击触发。"""
+        self.goal = goal
+
+    def plan(self) -> list[tuple[float, float]]:
+        """返回世界坐标路径点列表，单位为米。
+
+        路径点格式为 ``[(x1, y1), (x2, y2), ...]``，Simulator 会按实际
+        世界坐标绘制路径，而不是将路径强制吸附到栅格中心。
+        """
+        raise NotImplementedError
+
+
+class Controller(Planner):
+    def __init__(self, robo_map: Map, sim: Simulator) -> None:
+        super().__init__(robo_map, sim)
+        self.path: list[tuple[float, float]] = []
+
+    def set_path(self, path: list[tuple[float, float]]) -> None:
+        self.path = path
+
+    def plan(self) -> tuple[float, float]:
+        """Returns speed and omega value"""
+        raise NotImplementedError

@@ -1,6 +1,6 @@
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from sim.controller import Controller
 from sim.map import Map, MapInput
@@ -8,6 +8,7 @@ from sim.robot import Robot
 
 
 ControlCallback = Callable[["Simulator"], None]
+WorldPoint = tuple[float, float]
 
 
 class Simulator:
@@ -63,6 +64,10 @@ class Simulator:
         self._screen = None
         self._font = None
         self._clock = None
+        self._path: list[WorldPoint] = []
+        self._goal: tuple[float, float, float] | None = None
+        self._path_planner = None
+        self._manual_keys: set[int] = set()
 
     def set_control(self, speed: float, omega: float) -> None:
         """设置期望线速度和角速度，单位分别为 m/s 和 rad/s。"""
@@ -80,6 +85,49 @@ class Simulator:
         """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
         return self.robot.pose
 
+    def set_goal(self, goal: tuple[float, float] | tuple[float, float, float]) -> None:
+        """设置米制世界坐标目标点，pygame 单击地图也会调用此接口。"""
+        if len(goal) not in (2, 3):
+            raise ValueError("goal must contain (x, y) or (x, y, yaw)")
+        yaw = float(goal[2]) if len(goal) == 3 else 0.0
+        self._goal = (float(goal[0]), float(goal[1]), yaw)
+        if self._path_planner is not None:
+            self._path_planner.set_goal(self._goal)
+            self.refresh_path()
+
+    def get_goal(self) -> tuple[float, float, float] | None:
+        """获取当前目标点；没有设置目标时返回 ``None``。"""
+        return self._goal
+
+    def clear_goal(self) -> None:
+        """清除目标点和当前显示路径。"""
+        self._goal = None
+        self._path = []
+
+    def set_path(self, path: Iterable[WorldPoint]) -> None:
+        """接收 PathPlanner 生成的世界坐标路径并显示。"""
+        self._path = [(float(point[0]), float(point[1])) for point in path]
+
+    def get_path(self) -> list[WorldPoint]:
+        """获取当前显示的世界坐标路径副本。"""
+        return list(self._path)
+
+    def set_path_planner(self, planner) -> None:
+        """绑定提供 ``set_goal`` 和 ``plan`` 方法的 PathPlanner。"""
+        if not hasattr(planner, "plan") or not hasattr(planner, "set_goal"):
+            raise TypeError("planner must provide plan() and set_goal()")
+        self._path_planner = planner
+        if self._goal is not None:
+            planner.set_goal(self._goal)
+            self.refresh_path()
+
+    def refresh_path(self) -> list[WorldPoint]:
+        """重新调用 PathPlanner 并更新显示路径。"""
+        if self._path_planner is None:
+            return self.get_path()
+        self.set_path(self._path_planner.plan())
+        return self.get_path()
+
     def get_manual_control(
         self,
         speed: float = 0.1,
@@ -92,9 +140,8 @@ class Simulator:
         """
         if self._pygame is None:
             raise RuntimeError("manual control requires the pygame renderer")
-        keys = self._pygame.key.get_pressed()
-        linear_speed = speed if keys[self._pygame.K_UP] else -speed if keys[self._pygame.K_DOWN] else 0.0
-        angular_speed = -omega if keys[self._pygame.K_LEFT] else omega if keys[self._pygame.K_RIGHT] else 0.0
+        linear_speed = speed if self._pygame.K_UP in self._manual_keys else -speed if self._pygame.K_DOWN in self._manual_keys else 0.0
+        angular_speed = -omega if self._pygame.K_LEFT in self._manual_keys else omega if self._pygame.K_RIGHT in self._manual_keys else 0.0
         return linear_speed, angular_speed
 
     def step(self) -> tuple[float, float]:
@@ -175,8 +222,38 @@ class Simulator:
         for event in self._pygame.event.get():
             if event.type == self._pygame.QUIT:
                 self.stop()
-            elif event.type == self._pygame.KEYDOWN and event.key == self._pygame.K_ESCAPE:
-                self.stop()
+            elif event.type == self._pygame.KEYDOWN:
+                self._manual_keys.add(event.key)
+                if event.key == self._pygame.K_ESCAPE:
+                    self.stop()
+                elif event.key == self._pygame.K_g:
+                    self._set_goal_from_screen(self._pygame.mouse.get_pos())
+            elif event.type == self._pygame.KEYUP:
+                self._manual_keys.discard(event.key)
+            elif event.type == self._pygame.MOUSEBUTTONDOWN and event.button == 1:
+                self._set_goal_from_screen(event.pos)
+
+    def _set_goal_from_screen(self, position: tuple[int, int]) -> None:
+        """将地图窗口像素坐标转换为米制世界目标点。"""
+        if self.map is None:
+            return
+        height, width = self.map.shape
+        cell = self.window_scale
+        screen_x, screen_y = position
+        if not 0 <= screen_x < width * cell or not 0 <= screen_y < height * cell:
+            return
+        x = self.map.origin[0] + screen_x / cell * self.map.resolution
+        y = self.map.origin[1] + (height - screen_y / cell) * self.map.resolution
+        self.set_goal((x, y, 0.0))
+
+    def _world_to_screen(self, point: WorldPoint) -> tuple[int, int]:
+        """将米制世界坐标转换为 pygame 窗口像素坐标。"""
+        x, y = point
+        height, _ = self.map.shape
+        return (
+            round((x - self.map.origin[0]) / self.map.resolution * self.window_scale),
+            round((height - (y - self.map.origin[1]) / self.map.resolution) * self.window_scale),
+        )
 
     def _draw(self) -> None:
         pygame = self._pygame
@@ -190,6 +267,20 @@ class Simulator:
             for column in range(width):
                 color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
                 pygame.draw.rect(screen, color, (column * cell, row * cell, cell, cell))
+
+        if len(self._path) >= 2:
+            pygame.draw.lines(
+                screen,
+                (40, 120, 230),
+                False,
+                [self._world_to_screen(point) for point in self._path],
+                4,
+            )
+        for point in self._path:
+            pygame.draw.circle(screen, (40, 120, 230), self._world_to_screen(point), 4)
+
+        if self._goal is not None:
+            pygame.draw.circle(screen, (245, 190, 40), self._world_to_screen(self._goal[:2]), 9, 3)
 
         x, y, yaw = self.robot.pose
         map_width_m, map_height_m = world_map.size_meters
@@ -242,7 +333,9 @@ class Simulator:
             f"command w: {expected_omega:.3f} rad/s",
             f"feedback v: {feedback_speed:.3f} m/s",
             f"feedback w: {feedback_omega:.3f} rad/s",
+            f"path points: {len(self._path)}",
             "",
+            "left click / G: set goal",
             "ESC  close",
         ]
         for index, line in enumerate(lines):
@@ -257,3 +350,4 @@ class Simulator:
         self._screen = None
         self._font = None
         self._clock = None
+        self._manual_keys.clear()
