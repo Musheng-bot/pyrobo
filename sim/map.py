@@ -101,5 +101,43 @@ class Map:
     def is_free(self, x: float, y: float) -> bool:
         """Return whether the world coordinate ``(x, y)`` is free."""
         column, row = self.world_to_grid(x, y)
+        return self._is_free_cell(column, row)
+
+    def is_free_circle(self, x: float, y: float, radius: float) -> bool:
+        """Return whether a circle at ``(x, y)`` fits entirely in free cells."""
+        if radius < 0:
+            raise ValueError("radius must not be negative")
+
+        height, width = self.data.shape
+        map_width, map_height = self.size_meters
+        min_x, max_x = self.origin[0], self.origin[0] + map_width
+        min_y, max_y = self.origin[1], self.origin[1] + map_height
+        if x - radius < min_x or x + radius > max_x or y - radius < min_y or y + radius > max_y:
+            return False
+
+        min_column = int(np.floor((x - radius - self.origin[0]) / self.resolution))
+        max_column = int(
+            np.floor(np.nextafter((x + radius - self.origin[0]) / self.resolution, -np.inf))
+        )
+        min_row_from_bottom = int(np.floor((y - radius - self.origin[1]) / self.resolution))
+        max_row_from_bottom = int(
+            np.floor(np.nextafter((y + radius - self.origin[1]) / self.resolution, -np.inf))
+        )
+
+        for from_bottom in range(min_row_from_bottom, max_row_from_bottom + 1):
+            row = height - 1 - from_bottom
+            for column in range(min_column, max_column + 1):
+                cell_min_x = self.origin[0] + column * self.resolution
+                cell_max_x = cell_min_x + self.resolution
+                cell_min_y = self.origin[1] + from_bottom * self.resolution
+                cell_max_y = cell_min_y + self.resolution
+                closest_x = min(max(x, cell_min_x), cell_max_x)
+                closest_y = min(max(y, cell_min_y), cell_max_y)
+                touches_cell = (closest_x - x) ** 2 + (closest_y - y) ** 2 <= radius**2
+                if touches_cell and not self._is_free_cell(column, row):
+                    return False
+        return True
+
+    def _is_free_cell(self, column: int, row: int) -> bool:
         height, width = self.data.shape
         return 0 <= row < height and 0 <= column < width and bool(self.data[row, column])

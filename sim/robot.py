@@ -3,7 +3,14 @@ from collections.abc import Callable
 
 
 class Robot:
-    def __init__(self, pose: tuple[float, float, float] = (0.0, 0.0, 0.0)):
+    def __init__(
+        self,
+        pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        radius: float = 0.05,
+    ):
+        if radius <= 0:
+            raise ValueError("radius must be greater than zero")
+        self.radius = float(radius)
         self.reset(pose)
 
     def move(

@@ -26,6 +26,7 @@ class Simulator:
         speed_noise_std: float = 0.01,
         omega_noise_std: float = 0.05,
         seed: int | None = None,
+        robot_radius: float = 0.05,
         render: bool = True,
         window_scale: int = 48,
     ):
@@ -42,7 +43,7 @@ class Simulator:
             if map_data is not None
             else None
         )
-        self.robot = Robot()
+        self.robot = Robot(radius=robot_radius)
         self.controller = Controller(
             self.robot,
             self.time_step,
@@ -72,9 +73,29 @@ class Simulator:
     def get_pose(self) -> tuple[float, float, float]:
         return self.robot.pose
 
+    def get_manual_control(
+        self,
+        speed: float = 0.1,
+        omega: float = 1.5,
+    ) -> tuple[float, float]:
+        """Read pygame keyboard input as ``(speed, omega)``.
+
+        This is intended for a manual upper-level control mode. The simulator
+        still only returns the input; the caller must pass it to
+        :meth:`set_control`.
+        """
+        if self._pygame is None:
+            raise RuntimeError("manual control requires the pygame renderer")
+        keys = self._pygame.key.get_pressed()
+        linear_speed = speed if keys[self._pygame.K_UP] else -speed if keys[self._pygame.K_DOWN] else 0.0
+        angular_speed = -omega if keys[self._pygame.K_LEFT] else omega if keys[self._pygame.K_RIGHT] else 0.0
+        return linear_speed, angular_speed
+
     def step(self) -> tuple[float, float]:
         """Advance one simulation tick and return measured velocity."""
-        can_move = None if self.map is None else lambda pose: self.map.is_free(pose[0], pose[1])
+        can_move = None if self.map is None else lambda pose: self.map.is_free_circle(
+            pose[0], pose[1], self.robot.radius
+        )
         return self.controller.step(can_move)
 
     def run(self, callback: ControlCallback | None = None, duration: float | None = None) -> None:
@@ -118,7 +139,18 @@ class Simulator:
         self.is_running = False
 
     def _init_renderer(self) -> None:
-        import pygame
+        import warnings
+
+        with warnings.catch_warnings():
+            # pygame 2.6.1 imports pkg_resources internally; this warning is
+            # from pygame itself, not from the simulator code.
+            warnings.filterwarnings(
+                "ignore",
+                message="pkg_resources is deprecated as an API.*",
+                category=UserWarning,
+                module="pygame.pkgdata",
+            )
+            import pygame
 
         if self.map is None:
             raise ValueError("rendering requires map_data")
@@ -159,7 +191,8 @@ class Simulator:
         screen_y = height * cell - (y - world_map.origin[1]) / map_height_m * height * cell
         if 0 <= screen_x < width * cell and 0 <= screen_y < height * cell:
             center = (round(screen_x), round(screen_y))
-            pygame.draw.circle(screen, (220, 55, 55), center, max(6, cell // 4))
+            radius_pixels = max(1, round(self.robot.radius / world_map.resolution * cell))
+            pygame.draw.circle(screen, (220, 55, 55), center, radius_pixels)
             heading_length = cell * 0.45
             heading_end = (
                 round(center[0] + heading_length * math.cos(yaw)),
