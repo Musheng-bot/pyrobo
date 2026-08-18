@@ -1,44 +1,86 @@
-import argparse
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from sim.simulator import Simulator
 
 
-MAP_IMAGE = Path(__file__).parent / "examples" / "demo_map.pgm"
+ROOT_DIR = Path(__file__).resolve().parent
+CONFIG_FILE = ROOT_DIR / "config" / "sim.yaml"
+MAP_DIR = ROOT_DIR / "map"
+SUPPORTED_MAP_SUFFIXES = (".pgm", ".png")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the PyRobo simulator")
-    parser.add_argument(
-        "--mode",
-        choices=("manual", "auto"),
-        required=True,
-        help="control mode; this argument is required",
-    )
-    return parser.parse_args()
+def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as file:
+        config = yaml.safe_load(file) or {}
+    if not isinstance(config, dict):
+        raise ValueError(f"configuration root must be a mapping: {path}")
+    return config
+
+
+def get_mode(config: dict[str, Any]) -> str:
+    try:
+        mode = config["pyrobo"]["control"]["mode"]
+    except (KeyError, TypeError) as error:
+        raise ValueError("config must define pyrobo.control.mode as manual or auto") from error
+    if mode not in ("manual", "auto"):
+        raise ValueError(f"unsupported control mode: {mode!r}; expected manual or auto")
+    return mode
+
+
+def find_map(name: str) -> Path:
+    map_path = Path(name)
+    candidates = [map_path] if map_path.suffix else [
+        MAP_DIR / f"{name}{suffix}" for suffix in SUPPORTED_MAP_SUFFIXES
+    ]
+    if map_path.parent == Path(".") and map_path.suffix:
+        candidates = [MAP_DIR / map_path.name]
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve()
+    supported = ", ".join(SUPPORTED_MAP_SUFFIXES)
+    raise FileNotFoundError(f"map {name!r} was not found in {MAP_DIR} ({supported})")
 
 
 def setup_funcs(sim: Simulator) -> None:
     sim.robot.reset((0.15, 0.15, 0.0))
 
 
+def auto_control(sim: Simulator) -> tuple[float, float]:
+    """Example automatic controller; replace with planner/controller logic."""
+    return 0.1, 0.0
+
+
 def main() -> None:
-    args = parse_args()
+    config = load_config()
+    pyrobo = config.get("pyrobo")
+    if not isinstance(pyrobo, dict):
+        raise ValueError("config must define a pyrobo mapping")
+
+    mode = get_mode(config)
+    map_config = pyrobo.get("map")
+    if not isinstance(map_config, dict) or "name" not in map_config:
+        raise ValueError("config must define pyrobo.map.name")
+
+    map_file = find_map(str(map_config["name"]))
     sim = Simulator(
-        time_step=0.05,
-        map_data=MAP_IMAGE,
-        map_resolution=0.1,
-        map_origin=(0.0, 0.0),
+        time_step=float(pyrobo["time_step"]),
+        map_data=map_file,
+        map_resolution=float(map_config["resolution"]),
+        map_origin=(float(map_config["origin_x"]), float(map_config["origin_y"])),
+        robot_radius=float(pyrobo["robot_radius"]),
         speed_noise_std=0.01,
         omega_noise_std=0.05,
         seed=42,
-        robot_radius=0.05,
         render=True,
     )
     setup_funcs(sim)
 
     def control_loop(environment: Simulator) -> None:
-        if args.mode == "manual":
+        if mode == "manual":
             speed, omega = environment.get_manual_control()
         else:
             speed, omega = auto_control(environment)
@@ -49,11 +91,6 @@ def main() -> None:
         _ = feedback_speed, feedback_omega
 
     sim.run(callback=control_loop)
-
-
-def auto_control(sim: Simulator) -> tuple[float, float]:
-    """Example automatic controller; replace with planner/controller logic."""
-    return 0.1, 0.0
 
 
 if __name__ == "__main__":

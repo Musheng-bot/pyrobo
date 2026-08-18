@@ -1,0 +1,13 @@
+meta:
+  author: Musheng-bot
+  email: meisoren081@gmail.com
+pyrobo:
+  robot_radius: 0.025 # meter
+  time_step: 0.05    # seconds
+  map:
+    origin_x: 0.0    # meter
+    origin_y: 0.0    # meter
+    resolution: 0.05 # meter / pixel
+    name: "demo_map" # `map/*.pgm` or `map/*.png`
+  control:
+    mode: manual     # `manual` / `auto`
