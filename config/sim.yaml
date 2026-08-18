@@ -10,4 +10,11 @@ pyrobo:
     resolution: 0.05 # meter / pixel
     name: "demo_map" # `map/*.pgm` or `map/*.png`
   control:
-    mode: manual     # `manual` / `auto`
+    mode: manual      # `manual` or `auto`
+    speed_max: 2.0    # meter / second; absolute value
+    speed_min: 0.0    # meter / second; absolute value
+    acc_max: 1.0      # meter / second^2; not absolute value
+    acc_min: -1.0     # meter / second^2; not absolute value
+    angular_max: 3.14 # rad / second; absolute value
+    angular_min: 0.0  # rad / second; absolute value
+    allow_reverse: false
