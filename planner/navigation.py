@@ -2,6 +2,7 @@ from planner.planner import PathPlanner
 from sim.simulator import Simulator
 
 
+# 这是一个使用nav_cbk的示例
 def nav_cbk(sim: Simulator) -> None:
     """导航回调：自己读取目标点，并把计算出的路径交给 Simulator。"""
     goal = sim.get_goal()
