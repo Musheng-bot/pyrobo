@@ -109,6 +109,34 @@ class Map:
         column, row = self.world_to_grid(x, y)
         return self._is_free_cell(column, row)
 
+    def raycast(
+        self,
+        x: float,
+        y: float,
+        angle: float,
+        max_range: float,
+        step: float | None = None,
+    ) -> float:
+        """沿世界坐标射线查询到障碍物或地图边界的距离。
+
+        ``angle`` 使用世界坐标系弧度，``max_range`` 和返回值单位为米。
+        该接口是二维雷达的基础查询，命中障碍物时返回首次命中距离，
+        没有命中时返回 ``max_range``。
+        """
+        if max_range < 0:
+            raise ValueError("max_range must not be negative")
+        sample_step = step if step is not None else self.resolution / 4.0
+        if sample_step <= 0:
+            raise ValueError("step must be greater than zero")
+        distance = 0.0
+        while distance <= max_range:
+            sample_x = x + distance * np.cos(angle)
+            sample_y = y + distance * np.sin(angle)
+            if not self.is_free(sample_x, sample_y):
+                return distance
+            distance += sample_step
+        return float(max_range)
+
     def is_free_circle(self, x: float, y: float, radius: float) -> bool:
         """查询圆形机器人是否能放置在 ``(x, y)``。
 

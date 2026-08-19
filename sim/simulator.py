@@ -1,6 +1,7 @@
 import math
 import time
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 
 from sim.controller import Controller
 from sim.map import Map, MapInput
@@ -9,6 +10,14 @@ from sim.robot import Robot
 
 ControlCallback = Callable[["Simulator"], None]
 WorldPoint = tuple[float, float]
+
+
+@dataclass
+class _RobotAgent:
+    """Internal pairing of a robot and its controller."""
+
+    robot: Robot
+    controller: Controller
 
 
 class Simulator:
@@ -49,14 +58,19 @@ class Simulator:
             if map_data is not None
             else None
         )
-        self.robot = Robot(radius=robot_radius)
-        self.controller = Controller(
-            self.robot,
-            self.time_step,
+        self.robots: dict[str, Robot] = {}
+        self.controllers: dict[str, Controller] = {}
+        self._agents: dict[str, _RobotAgent] = {}
+        self.add_robot(
+            name="robot",
+            pose=(0.0, 0.0, 0.0),
+            radius=robot_radius,
             speed_noise_std=speed_noise_std,
             omega_noise_std=omega_noise_std,
             seed=seed,
         )
+        self.robot = self.robots["robot"]
+        self.controller = self.controllers["robot"]
         self.render_enabled = render
         self.window_scale = window_scale
         self.is_running = False
@@ -68,21 +82,78 @@ class Simulator:
         self._goal: tuple[float, float, float] | None = None
         self._manual_keys: set[int] = set()
 
-    def set_control(self, speed: float, omega: float) -> None:
+    def add_robot(
+        self,
+        name: str | None = None,
+        pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        radius: float = 0.05,
+        speed_noise_std: float = 0.01,
+        omega_noise_std: float = 0.05,
+        seed: int | None = None,
+    ) -> str:
+        """添加机器人并返回其名称。
+
+        每个机器人拥有独立的 ``Robot`` 和 ``Controller``。名称用于之后
+        调用 ``set_control``、``get_feedback``、``get_pose`` 和 ``get_lidar``。
+        第一个默认机器人名称为 ``"robot"``。
+        """
+        if name is None:
+            index = 1
+            while f"robot_{index}" in self._agents:
+                index += 1
+            name = f"robot_{index}"
+        if not name or name in self._agents:
+            raise ValueError(f"robot name is invalid or already exists: {name!r}")
+
+        robot = Robot(pose=pose, radius=radius)
+        controller = Controller(
+            robot,
+            self.time_step,
+            speed_noise_std=speed_noise_std,
+            omega_noise_std=omega_noise_std,
+            seed=seed,
+        )
+        self.robots[name] = robot
+        self.controllers[name] = controller
+        self._agents[name] = _RobotAgent(robot, controller)
+        return name
+
+    def remove_robot(self, name: str) -> None:
+        """移除指定名称的机器人；默认机器人不能被移除。"""
+        if name == "robot":
+            raise ValueError("the default robot cannot be removed")
+        if name not in self._agents:
+            raise KeyError(f"unknown robot: {name}")
+        del self._agents[name]
+        del self.robots[name]
+        del self.controllers[name]
+
+    def get_robot(self, name: str = "robot") -> Robot:
+        """获取指定名称的机器人对象。"""
+        try:
+            return self.robots[name]
+        except KeyError as error:
+            raise KeyError(f"unknown robot: {name}") from error
+
+    def robot_names(self) -> tuple[str, ...]:
+        """返回当前环境中的所有机器人名称。"""
+        return tuple(self._agents)
+
+    def set_control(self, speed: float, omega: float, robot_id: str = "robot") -> None:
         """设置期望线速度和角速度，单位分别为 m/s 和 rad/s。"""
-        self.controller.set_control(speed, omega)
+        self.controllers[robot_id].set_control(speed, omega)
 
-    def get_control(self) -> tuple[float, float]:
+    def get_control(self, robot_id: str = "robot") -> tuple[float, float]:
         """获取当前设置的期望 ``(speed, omega)``。"""
-        return self.controller.get_control()
+        return self.controllers[robot_id].get_control()
 
-    def get_feedback(self) -> tuple[float, float]:
+    def get_feedback(self, robot_id: str = "robot") -> tuple[float, float]:
         """获取最近一个仿真周期的实际 ``(speed, omega)`` 反馈。"""
-        return self.controller.get_feedback()
+        return self.controllers[robot_id].get_feedback()
 
-    def get_pose(self) -> tuple[float, float, float]:
+    def get_pose(self, robot_id: str = "robot") -> tuple[float, float, float]:
         """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
-        return self.robot.pose
+        return self.robots[robot_id].pose
 
     def set_goal(self, goal: tuple[float, float] | tuple[float, float, float]) -> None:
         """设置米制世界坐标目标点，pygame 单击地图也会调用此接口。
@@ -132,12 +203,62 @@ class Simulator:
         angular_speed = -omega if self._pygame.K_LEFT in self._manual_keys else omega if self._pygame.K_RIGHT in self._manual_keys else 0.0
         return linear_speed, angular_speed
 
-    def step(self) -> tuple[float, float]:
+    def get_lidar(
+        self,
+        robot_id: str = "robot",
+        count: int = 360,
+        max_range: float = 3.0,
+        fov: float = 2 * math.pi,
+    ) -> list[float]:
+        """获取二维雷达距离数组，角度相对机器人朝向均匀分布。
+
+        返回数组第 ``i`` 项对应的角度为
+        ``-fov / 2 + i * fov / count``，单位为弧度；距离单位为米。
+        当前雷达读取静态地图，不读取其他机器人。
+        """
+        if self.map is None:
+            raise RuntimeError("lidar requires map_data")
+        if count <= 0 or max_range < 0 or fov <= 0:
+            raise ValueError("count must be positive, max_range non-negative, fov positive")
+        x, y, yaw = self.robots[robot_id].pose
+        return [
+            self.map.raycast(
+                x,
+                y,
+                yaw - fov / 2 + index * fov / count,
+                max_range,
+            )
+            for index in range(count)
+        ]
+
+    def step(self, robot_id: str = "robot") -> tuple[float, float]:
         """推进一个仿真周期，并返回实际反馈 ``(speed, omega)``。"""
-        can_move = None if self.map is None else lambda pose: self.map.is_free_circle(
-            pose[0], pose[1], self.robot.radius
-        )
-        return self.controller.step(can_move)
+        if robot_id not in self._agents:
+            raise KeyError(f"unknown robot: {robot_id}")
+        feedback: dict[str, tuple[float, float]] = {}
+        for name, agent in self._agents.items():
+            feedback[name] = agent.controller.step(self._can_move(name))
+        return feedback[robot_id]
+
+    def _can_move(self, robot_id: str) -> Callable[[tuple[float, float, float]], bool] | None:
+        """创建单个机器人的地图和其他机器人碰撞检查函数。"""
+        if self.map is None and len(self._agents) == 1:
+            return None
+        robot = self.robots[robot_id]
+
+        def can_move(pose: tuple[float, float, float]) -> bool:
+            if self.map is not None and not self.map.is_free_circle(pose[0], pose[1], robot.radius):
+                return False
+            for other_id, other in self.robots.items():
+                if other_id == robot_id:
+                    continue
+                other_x, other_y, _ = other.pose
+                distance = math.hypot(pose[0] - other_x, pose[1] - other_y)
+                if distance < robot.radius + other.radius:
+                    return False
+            return True
+
+        return can_move
 
     def run(self, callback: ControlCallback | None = None, duration: float | None = None) -> None:
         """在当前线程运行仿真环境。
@@ -270,20 +391,22 @@ class Simulator:
         if self._goal is not None:
             pygame.draw.circle(screen, (245, 190, 40), self._world_to_screen(self._goal[:2]), 9, 3)
 
-        x, y, yaw = self.robot.pose
         map_width_m, map_height_m = world_map.size_meters
-        screen_x = (x - world_map.origin[0]) / map_width_m * width * cell
-        screen_y = height * cell - (y - world_map.origin[1]) / map_height_m * height * cell
-        if 0 <= screen_x < width * cell and 0 <= screen_y < height * cell:
-            center = (round(screen_x), round(screen_y))
-            radius_pixels = max(1, round(self.robot.radius / world_map.resolution * cell))
-            pygame.draw.circle(screen, (220, 55, 55), center, radius_pixels)
-            heading_length = cell * 0.45
-            heading_end = (
-                round(center[0] + heading_length * math.cos(yaw)),
-                round(center[1] - heading_length * math.sin(yaw)),
-            )
-            pygame.draw.line(screen, (120, 20, 20), center, heading_end, 3)
+        for index, (robot_id, robot) in enumerate(self.robots.items()):
+            x, y, yaw = robot.pose
+            screen_x = (x - world_map.origin[0]) / map_width_m * width * cell
+            screen_y = height * cell - (y - world_map.origin[1]) / map_height_m * height * cell
+            if 0 <= screen_x < width * cell and 0 <= screen_y < height * cell:
+                center = (round(screen_x), round(screen_y))
+                radius_pixels = max(1, round(robot.radius / world_map.resolution * cell))
+                color = (220, 55, 55) if index == 0 else (230, 130, 35)
+                pygame.draw.circle(screen, color, center, radius_pixels)
+                heading_length = cell * 0.45
+                heading_end = (
+                    round(center[0] + heading_length * math.cos(yaw)),
+                    round(center[1] - heading_length * math.sin(yaw)),
+                )
+                pygame.draw.line(screen, (120, 20, 20), center, heading_end, 3)
 
         # Keep grid lines as a low-contrast visual aid instead of the main map.
         grid_layer = pygame.Surface((width * cell, height * cell), pygame.SRCALPHA)
@@ -305,6 +428,7 @@ class Simulator:
 
         panel_x = width * cell
         pygame.draw.rect(screen, (35, 40, 48), (panel_x, 0, 280, screen.get_height()))
+        x, y, yaw = self.robot.pose
         expected_speed, expected_omega = self.get_control()
         feedback_speed, feedback_omega = self.get_feedback()
         lines = [
@@ -312,6 +436,7 @@ class Simulator:
             "",
             f"resolution: {world_map.resolution:.3f} m/pixel",
             f"map size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
+            f"robots: {len(self.robots)}",
             "",
             f"pose x: {x:.3f} m",
             f"pose y: {y:.3f} m",
