@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from sim.controller import Controller
+from sim.controller import ControlLimits, Controller
 from sim.kinematics import Kinematics
 
 
@@ -14,6 +14,7 @@ class Robot:
         omega_noise_std: float = 0.05,
         seed: int | None = None,
         kinematics: Kinematics | None = None,
+        limits: ControlLimits | None = None,
     ):
         """创建机器人。
 
@@ -32,22 +33,23 @@ class Robot:
             omega_noise_std=omega_noise_std,
             seed=seed,
             kinematics=kinematics,
+            limits=limits,
         )
 
     def move(
         self,
-        speed: float,
-        omega: float,
+        first: float,
+        second: float,
         time_step: float,
         can_move: Callable[[tuple[float, float, float]], bool] | None = None,
     ) -> tuple[float, float]:
-        """按照给定速度移动，并返回实际执行的 ``(speed, omega)``。
+        """按照给定的两个控制量移动，并返回实际执行的两个控制量。
 
         如果 ``can_move`` 判定下一位姿碰撞，机器人不会平移，但仍可以
         原地旋转，因此反馈速度为 0，角速度仍然有效。
         """
         self.controller.time_step = float(time_step)
-        self.controller.set_control(speed, omega)
+        self.controller.set_control(first, second)
         return self.controller.step(can_move)
 
     def _commit_pose(self, pose: tuple[float, float, float]) -> None:

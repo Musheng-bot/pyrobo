@@ -35,39 +35,6 @@ class Kinematics(ABC):
         """将模型指令转换为统一的 ``(vx, vy, omega)`` 反馈。"""
 
 
-class UnicycleKinematics(Kinematics):
-    """单轮/差速模型，指令为 ``(v, omega)``。"""
-
-    def predict_pose(self, pose: Pose, command: Command, time_step: float) -> Pose:
-        x, y, yaw = pose
-        speed, omega = command
-        return (
-            x + speed * time_step * math.cos(yaw),
-            y + speed * time_step * math.sin(yaw),
-            yaw + omega * time_step,
-        )
-
-    def add_noise(
-        self,
-        command: Command,
-        random_source: random.Random,
-        speed_noise_std: float,
-        omega_noise_std: float,
-    ) -> Command:
-        speed, omega = command
-        return (
-            speed + random_source.gauss(0.0, speed_noise_std),
-            omega + random_source.gauss(0.0, omega_noise_std),
-        )
-
-    def blocked_command(self, command: Command) -> Command:
-        return 0.0, command[1]
-
-    def feedback(self, command: Command) -> tuple[float, float, float]:
-        speed, omega = command
-        return speed, 0.0, omega
-
-
 class HolonomicKinematics(Kinematics):
     """全向轮模型，指令为机器人坐标系下的 ``(vx, vy)``。"""
 

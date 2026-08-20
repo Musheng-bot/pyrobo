@@ -11,12 +11,22 @@ pyrobo:
     name: "map" # `map/*.pgm` or `map/*.png`
   control:
     mode: manual # `manual` or `auto`
-    speed_max: 2.0 # meter / second; absolute value
-    speed_min: 0.0 # meter / second; absolute value
-    acc_max: 1.0 # meter / second^2; not absolute value
-    acc_min: -1.0 # meter / second^2; not absolute value
-    angular_max: 3.14 # rad / second; absolute value
-    angular_min: 0.0 # rad / second; absolute value
+    command_type: vx_vy # candidate may implement another model in sim
+    vx_vy:
+      vx_max: 1.5
+      vx_min: 0.0
+      vy_max: 1.5
+      vy_min: 0.0
+      acc_max: 1.0 # meter / second^2; not absolute value
+      acc_min: -1.0 # meter / second^2; not absolute value
+    v_omega:
+      speed_max: 2.0 # meter / second; absolute value
+      speed_min: 0.0 # meter / second; absolute value
+      acc_max: 1.0 # meter / second^2; not absolute value
+      acc_min: -1.0 # meter / second^2; not absolute value
+      omega_max: 3.14
+      omega_min: 0.0
+
     allow_reverse: false # unused
   robot:
     initial:

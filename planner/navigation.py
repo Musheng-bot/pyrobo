@@ -10,17 +10,17 @@ def nav_cbk(sim: Simulator) -> None:
         sim.set_display_path([])
         sim.set_control(0.0, 0.0)
         return
-
-    planner = PathPlanner(sim.map, sim)
+    if sim.map is not None:
+        planner = PathPlanner(sim.map, sim)
     planner.set_goal(goal)
     path = planner.plan()
     sim.set_display_path(path)
 
     # 这里根据 path、机器人位姿和反馈计算下一周期控制量。
-    speed, omega = follow_path(sim, path)
-    sim.set_control(speed, omega)
+    vx, vy = follow_path(sim, path)
+    sim.set_control(vx, vy)
 
 
 def follow_path(sim: Simulator, path: list[tuple[float, float]]) -> tuple[float, float]:
-    """根据路径计算下一周期的线速度和角速度。"""
+    """根据路径计算下一周期的机器人坐标系速度 ``(vx, vy)``。"""
     raise NotImplementedError("implement path following here")

@@ -3,6 +3,7 @@ from typing import Any
 
 import yaml
 
+from planner.navigation import nav_cbk
 from sim.simulator import Simulator
 
 
@@ -76,11 +77,6 @@ def get_robot_config(config: dict[str, Any]) -> tuple[tuple[float, float, float]
     return initial_pose, goal_pose
 
 
-def auto_control(sim: Simulator) -> tuple[float, float]:
-    """Example automatic controller; replace with planner/controller logic."""
-    return 0.1, 0.0
-
-
 def main() -> None:
     config = load_config()
     pyrobo = config.get("pyrobo")
@@ -89,6 +85,9 @@ def main() -> None:
 
     mode = get_mode(config)
     initial_pose, goal = get_robot_config(config)
+    control_config = pyrobo.get("control")
+    if not isinstance(control_config, dict):
+        raise ValueError("config must define pyrobo.control")
     map_config = pyrobo.get("map")
     if not isinstance(map_config, dict) or "name" not in map_config:
         raise ValueError("config must define pyrobo.map.name")
@@ -103,23 +102,22 @@ def main() -> None:
         speed_noise_std=0.01,
         omega_noise_std=0.05,
         seed=42,
+        control_config=control_config,
         render=True,
     )
     sim.robot.reset(initial_pose)
     sim.set_goal(goal)
 
-    def control_loop(environment: Simulator) -> None:
-        if mode == "manual":
-            speed, omega = environment.get_manual_control()
-        else:
-            speed, omega = auto_control(environment)
-        environment.set_control(speed, omega)
+    def manual_control(environment: Simulator) -> None:
+        vx, vy = environment.get_manual_control()
+        environment.set_control(vx, vy)
 
         # Upper-level software can consume the previous tick's feedback here.
-        feedback_speed, feedback_omega = environment.get_feedback()
-        _ = feedback_speed, feedback_omega
+        feedback_vx, feedback_vy = environment.get_feedback()
+        _ = feedback_vx, feedback_vy
 
-    sim.run(callback=control_loop)
+    callback = manual_control if mode == "manual" else nav_cbk
+    sim.run(callback=callback)
 
 
 if __name__ == "__main__":

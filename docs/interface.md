@@ -1,77 +1,111 @@
-# PyRobo 上层导航接口
+# PyRobo 接口说明
 
-本文档只说明导航、规划和控制算法需要使用的接口。地图加载、pygame 窗口、噪声和机器人运动由 `Simulator` 内部负责。
+除运动学模型题目外，题目代码只需要在 `planner` 包中完成。地图、机器人运动、碰撞检测和 pygame 界面由 `sim` 包提供；运动学模型题目允许修改 `sim` 包。
 
 ## 基本约定
 
-- 位置单位：米。
-- 线速度单位：`m/s`。
-- 角速度单位：`rad/s`。
-- 位姿格式：`(x, y, yaw)`。
-- 路径格式：`[(x1, y1), (x2, y2), ...]`。
-- 路径和目标点都使用世界坐标，不使用图片像素坐标。
+- 世界坐标单位是米，角度单位是弧度。
+- 位姿格式是 `(x, y, yaw)`。
+- 路径格式是 `[(x1, y1), (x2, y2), ...]`。
+- 地图数组使用图片索引：`data[row, column]`。
+- 世界坐标中 x 向右、y 向上。
 
-## 导航回调
+## 一、地图查询
+
+导航回调可以通过 `sim.map` 查询已知地图：
+
+```python
+world_map = sim.map
+```
+
+### 地图数据
+
+```python
+world_map.data       # numpy.ndarray，True 表示可通行，False 表示障碍物
+world_map.shape      # (height, width)
+world_map.resolution # 米/像素
+world_map.origin     # (origin_x, origin_y)
+```
+
+地图图片默认按以下规则解释：白色区域可通行，黑色区域为障碍物。
+
+### 世界坐标和栅格坐标转换
+
+```python
+column, row = world_map.world_to_grid(x, y)
+x, y = world_map.grid_to_world(column, row)
+```
+
+`world_to_grid()` 返回 `(column, row)`，而 `data` 使用 `[row, column]` 访问。`grid_to_world()` 返回栅格中心的世界坐标。
+
+### 查询可通行区域
+
+```python
+free = world_map.is_free(x, y)
+```
+
+地图外的位置返回 `False`。
+
+查询带半径机器人的可行位置：
+
+```python
+free = world_map.is_free_circle(x, y, radius)
+```
+
+只要机器人圆形范围接触障碍物或地图边界，就会返回 `False`。这个接口可以直接用于带机器人半径的路径检查，也可以作为地图膨胀的基础。
+
+获取地图实际尺寸：
+
+```python
+width_m, height_m = world_map.size_meters
+```
+
+## 二、Simulator 中的机器人接口
+
+导航回调的基本形式是：
 
 ```python
 def nav_cbk(sim: Simulator) -> None:
     ...
 
-
 sim.run(callback=nav_cbk)
 ```
 
-每个周期的执行顺序是：
+每个周期的顺序是：
 
 ```text
-机器人执行上一周期控制量
-        ↓
-Simulator 更新反馈和位姿
-        ↓
+执行上一周期控制量
+    ↓
+更新机器人位姿和反馈
+    ↓
 调用 nav_cbk(sim)
-        ↓
-nav_cbk 设置下一周期控制量
+    ↓
+设置下一周期控制量
 ```
 
-因此，回调中读取到的是当前周期反馈，设置的控制量在下一周期生效。
+因此，回调中读取到的是当前周期状态，设置的控制量在下一周期生效。
 
-## 控制量
-
-```python
-sim.set_control(
-    speed: float,
-omega: float,
-robot_id: str = "robot",
-) -> None
-```
-
-设置期望线速度和角速度。Simulator 内部会加入控制噪声，实际执行速度通过 `get_feedback()` 获取。
+### 获取机器人位姿
 
 ```python
-sim.set_control(speed=0.2, omega=0.0)
-```
-
-## 反馈和位姿
-
-```python
-sim.get_feedback(robot_id: str = "robot") -> tuple[float, float]
-sim.get_pose(robot_id: str = "robot") -> tuple[float, float, float]
-```
-
-```python
-feedback_speed, feedback_omega = sim.get_feedback()
 x, y, yaw = sim.get_pose()
+x, y, yaw = sim.get_pose(robot_id="robot_2")
 ```
 
-`get_feedback()` 返回最近一个周期实际执行的线速度和角速度；`get_pose()` 返回当前世界位姿。
-
-## 目标点
+获取机器人对象及其半径：
 
 ```python
-sim.get_goal() -> tuple[float, float, float] | None
+robot = sim.get_robot()
+radius = robot.radius
 ```
 
-用户可以在 pygame 地图中左键点击，或按 `G` 配合鼠标位置设置目标点。目标点只保存在 Simulator 中，不会自动调用规划器。
+### 获取目标点
+
+```python
+goal = sim.get_goal()
+```
+
+返回 `(x, y, yaw)`；没有目标点时返回 `None`。
 
 ```python
 goal = sim.get_goal()
@@ -82,77 +116,115 @@ if goal is None:
 goal_x, goal_y, goal_yaw = goal
 ```
 
-测试或上层程序也可以主动设置、清除目标点：
+目标点可以由 pygame 地图点击设置，也可以由程序设置或清除：
 
 ```python
 sim.set_goal((x, y))
+sim.set_goal((x, y, yaw))
 sim.clear_goal()
 ```
 
-## 路径显示
+当前目标点接口针对默认机器人。多机器人题目中的其他目标点可以由导航代码自行保存。
+
+### 获取实际反馈速度
 
 ```python
-sim.set_display_path(path: Iterable[tuple[float, float]]) -> None
+first, second = sim.get_feedback()
+first, second = sim.get_feedback(robot_id="robot_2")
 ```
 
-向 Simulator 提供要显示的世界坐标路径。路径可以来自任意算法，不要求使用 `PathPlanner`。
+当前默认运动学模型下，返回最近一个周期实际执行的 `(vx, vy)`。反馈包含仿真器加入的噪声以及碰撞限制后的实际结果。
+
+也可以获取包含角速度占位项的统一 `(vx, vy, omega)` 反馈：
 
 ```python
-path = planner.plan(current_pose=sim.get_pose(), goal=sim.get_goal())
-sim.set_display_path(path)
+vx, vy, omega = sim.get_vector_feedback()
 ```
 
-清空路径显示：
+### 设置控制量
+
+统一控制接口是：
 
 ```python
-sim.set_display_path([])
+sim.set_control(a, b)
 ```
 
-## 二维雷达
+当前默认使用全向运动学模型，两个参数解释为机器人坐标系下的：
 
 ```python
-sim.get_lidar(
-    robot_id: str = "robot",
-count: int = 360,
-max_range: float = 3.0,
-fov: float = 2 * math.pi,
-) -> list[float]
+sim.set_control(vx, vy)
 ```
 
-返回距离数组，距离单位为米。第 `i` 项对应的相对角度为：
+多机器人控制：
+
+```python
+sim.set_control(0.2, 0.0, robot_id="robot_2")
+```
+
+### 控制量限制
+
+`Simulator` 会读取配置文件中 `pyrobo.control.command_type` 对应的参数组，并在执行前自动限制控制量。
+
+当前 `vx_vy` 配置使用：
+
+```yaml
+control:
+  command_type: vx_vy
+  vx_vy:
+    vx_max: 1.5
+    vx_min: 0.0
+    vy_max: 1.5
+    vy_min: 0.0
+    acc_max: 1.0
+    acc_min: -1.0
+```
+
+限制顺序是：加入仿真噪声、限制速度、限制加速度，然后执行运动学模型。`*_min` 表示非零控制量的最小绝对值，零指令仍保持为零。
+
+获取当前控制量：
+
+```python
+a, b = sim.get_control()
+```
+
+## 三、二维雷达
+
+```python
+import math
+
+ranges = sim.get_lidar(
+    count=360,
+    max_range=3.0,
+    fov=2 * math.pi,
+)
+```
+
+返回长度为 `count` 的距离数组，距离单位为米。第 `i` 项对应机器人坐标系中的相对角度：
 
 ```python
 angle = -fov / 2 + i * fov / count
 ```
 
+没有命中障碍物或地图边界时返回 `max_range`。当前雷达只读取静态地图，不读取其他机器人。
+
 ```python
-ranges = sim.get_lidar(count=360, max_range=3.0)
 front_distance = ranges[len(ranges) // 2]
+ranges = sim.get_lidar(robot_id="robot_2")
 ```
 
-雷达适合用于未知地图、局部避障和在线重规划。当前雷达只读取静态地图，不包含其他机器人。
-
-## 多机器人
+## 四、显示规划路径
 
 ```python
-robot_id = sim.add_robot(
-    name="robot_2",
-    pose=(1.0, 0.5, 0.0),
-    radius=0.05,
-)
+sim.set_display_path(path)
 ```
 
-之后通过 `robot_id` 分别控制和读取：
+路径点必须使用世界坐标。清除路径显示：
 
 ```python
-sim.set_control(0.2, 0.0, robot_id="robot_2")
-pose = sim.get_pose(robot_id="robot_2")
-feedback = sim.get_feedback(robot_id="robot_2")
+sim.set_display_path([])
 ```
 
-所有机器人会在同一个 `sim.step()` 中推进，Simulator 会检查机器人之间的圆形碰撞。
-
-## 推荐导航回调
+## 五、推荐的导航回调结构
 
 ```python
 def nav_cbk(sim: Simulator) -> None:
@@ -165,16 +237,11 @@ def nav_cbk(sim: Simulator) -> None:
         sim.set_control(0.0, 0.0)
         return
 
-    # 1. 使用 pose、goal 和地图或雷达数据规划路径
-    path = planner.plan(pose, goal)
-
-    # 2. 在 pygame 中显示路径
+    # 使用 sim.map、pose、goal 或 sim.get_lidar() 规划路径
+    path = planner.plan()
     sim.set_display_path(path)
 
-    # 3. 根据路径、位姿和反馈计算控制量
-    speed, omega = controller.follow(path, pose, feedback)
-    sim.set_control(speed, omega)
-
-
-sim.run(callback=nav_cbk)
+    # 根据路径、当前位姿和反馈计算下一周期控制量
+    a, b = controller.follow(path, pose, feedback)
+    sim.set_control(a, b)
 ```

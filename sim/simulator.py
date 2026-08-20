@@ -2,8 +2,9 @@ import math
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Any
 
-from sim.controller import Controller
+from sim.controller import ControlLimits, Controller
 from sim.kinematics import Kinematics
 from sim.map import Map, MapInput
 from sim.robot import Robot
@@ -38,6 +39,7 @@ class Simulator:
         omega_noise_std: float = 0.05,
         seed: int | None = None,
         kinematics: Kinematics | None = None,
+        control_config: dict[str, Any] | None = None,
         robot_radius: float = 0.05,
         render: bool = True,
         window_scale: int | None = None,
@@ -53,6 +55,7 @@ class Simulator:
             raise ValueError("window_scale must be greater than zero")
 
         self.time_step = float(time_step)
+        self.control_limits = self._parse_control_limits(control_config)
         self.map = (
             map_data
             if isinstance(map_data, Map)
@@ -117,11 +120,48 @@ class Simulator:
             omega_noise_std=omega_noise_std,
             seed=seed,
             kinematics=kinematics,
+            limits=self.control_limits,
         )
         self.robots[name] = robot
         self.controllers[name] = robot.controller
         self._agents[name] = _RobotAgent(robot, robot.controller)
         return name
+
+    @staticmethod
+    def _parse_control_limits(
+        control_config: dict[str, Any] | None,
+    ) -> ControlLimits | None:
+        if control_config is None:
+            return None
+        command_type = control_config.get("command_type", "vx_vy")
+        profile = control_config.get(command_type)
+        if not isinstance(profile, dict):
+            raise ValueError(f"control config must define a {command_type!r} profile")
+
+        if command_type == "vx_vy":
+            maximum_keys = ("vx_max", "vy_max")
+            minimum_keys = ("vx_min", "vy_min")
+        elif command_type == "v_omega":
+            maximum_keys = ("speed_max", "omega_max")
+            minimum_keys = ("speed_min", "omega_min")
+        else:
+            raise ValueError(f"unsupported control command type: {command_type!r}")
+
+        try:
+            maximum = tuple(float(profile[key]) for key in maximum_keys)
+            minimum = tuple(float(profile[key]) for key in minimum_keys)
+            acceleration_max = float(profile["acc_max"])
+            acceleration_min = float(profile["acc_min"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(
+                f"invalid control limits for command type {command_type!r}"
+            ) from error
+        return ControlLimits(
+            maximum=maximum,  # type: ignore[arg-type]
+            minimum=minimum,  # type: ignore[arg-type]
+            acceleration_max=acceleration_max,
+            acceleration_min=acceleration_min,
+        )
 
     def remove_robot(self, name: str) -> None:
         """移除指定名称的机器人；默认机器人不能被移除。"""
@@ -144,16 +184,16 @@ class Simulator:
         """返回当前环境中的所有机器人名称。"""
         return tuple(self._agents)
 
-    def set_control(self, speed: float, omega: float, robot_id: str = "robot") -> None:
-        """设置期望线速度和角速度，单位分别为 m/s 和 rad/s。"""
-        self.controllers[robot_id].set_control(speed, omega)
+    def set_control(self, first: float, second: float, robot_id: str = "robot") -> None:
+        """设置机器人当前运动学模型所需的两个控制量。"""
+        self.controllers[robot_id].set_control(first, second)
 
     def get_control(self, robot_id: str = "robot") -> tuple[float, float]:
-        """获取当前设置的期望 ``(speed, omega)``。"""
+        """获取当前设置的两个期望控制量。"""
         return self.controllers[robot_id].get_control()
 
     def get_feedback(self, robot_id: str = "robot") -> tuple[float, float]:
-        """获取最近一个仿真周期的实际 ``(speed, omega)`` 反馈。"""
+        """获取最近一个仿真周期的两个实际控制量。"""
         return self.controllers[robot_id].get_feedback()
 
     def get_vector_feedback(self, robot_id: str = "robot") -> tuple[float, float, float]:
@@ -199,30 +239,30 @@ class Simulator:
     def get_manual_control(
         self,
         speed: float = 1.0,
-        omega: float = 1.5,
+        lateral_speed: float = 1.0,
     ) -> tuple[float, float]:
-        """读取 pygame 键盘输入并返回 ``(speed, omega)``。
+        """读取 WASD 键盘输入并返回机器人坐标系下的 ``(vx, vy)``。
 
         该函数只读取输入，不会自动设置控制量；调用方仍需把返回值传给
-        :meth:`set_control`。方向键对应前进、后退、左转和右转。
+        :meth:`set_control`。W/S 对应前进和后退，A/D 对应左移和右移。
         """
         if self._pygame is None:
             raise RuntimeError("manual control requires the pygame renderer")
         linear_speed = (
             speed
-            if self._pygame.K_UP in self._manual_keys
+            if self._pygame.K_w in self._manual_keys
             else -speed
-            if self._pygame.K_DOWN in self._manual_keys
+            if self._pygame.K_s in self._manual_keys
             else 0.0
         )
-        angular_speed = (
-            omega
-            if self._pygame.K_LEFT in self._manual_keys
-            else -omega
-            if self._pygame.K_RIGHT in self._manual_keys
+        lateral_velocity = (
+            lateral_speed
+            if self._pygame.K_a in self._manual_keys
+            else -lateral_speed
+            if self._pygame.K_d in self._manual_keys
             else 0.0
         )
-        return linear_speed, angular_speed
+        return linear_speed, lateral_velocity
 
     def get_lidar(
         self,
@@ -253,7 +293,7 @@ class Simulator:
         ]
 
     def step(self, robot_id: str = "robot") -> tuple[float, float]:
-        """推进一个仿真周期，并返回实际反馈 ``(speed, omega)``。"""
+        """推进一个仿真周期，并返回两个实际控制量。"""
         if robot_id not in self._agents:
             raise KeyError(f"unknown robot: {robot_id}")
         feedback: dict[str, tuple[float, float]] = {}
@@ -468,8 +508,8 @@ class Simulator:
         panel_x = width * cell
         pygame.draw.rect(screen, (35, 40, 48), (panel_x, 0, 280, screen.get_height()))
         x, y, yaw = self.robot.pose
-        expected_speed, expected_omega = self.get_control()
-        feedback_speed, feedback_omega = self.get_feedback()
+        expected_vx, expected_vy = self.get_control()
+        feedback_vx, feedback_vy = self.get_feedback()
         lines = [
             "PYROBO SIMULATOR",
             "",
@@ -481,13 +521,13 @@ class Simulator:
             f"pose y: {y:.3f} m",
             f"pose yaw: {self.robot.pose[2]:.3f} rad",
             "",
-            f"command v: {expected_speed:.3f} m/s",
-            f"command w: {expected_omega:.3f} rad/s",
-            f"feedback v: {feedback_speed:.3f} m/s",
-            f"feedback w: {feedback_omega:.3f} rad/s",
+            f"command vx: {expected_vx:.3f} m/s",
+            f"command vy: {expected_vy:.3f} m/s",
+            f"feedback vx: {feedback_vx:.3f} m/s",
+            f"feedback vy: {feedback_vy:.3f} m/s",
             f"path points: {len(self._display_path)}",
             "",
-            "left click / G: set goal",
+            "WASD: move    left click / G: set goal",
             "ESC  close",
         ]
         for index, line in enumerate(lines):
