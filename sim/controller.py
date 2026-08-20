@@ -51,7 +51,9 @@ class Controller:
         """获取当前期望控制量，返回 ``(speed, omega)``。"""
         return self._expected_speed, self._expected_omega
 
-    def step(self, can_move: Callable[[tuple[float, float, float]], bool] | None = None) -> tuple[float, float]:
+    def step(
+        self, can_move: Callable[[tuple[float, float, float]], bool] | None = None
+    ) -> tuple[float, float]:
         """执行一个仿真周期，并返回机器人实际反馈 ``(speed, omega)``。
 
         ``can_move`` 是可选的碰撞检查函数，接收预测位姿并返回是否允许移动。

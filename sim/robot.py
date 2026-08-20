@@ -38,7 +38,9 @@ class Robot:
         self.__pose = next_pose
         return speed, omega
 
-    def predict_pose(self, speed: float, omega: float, time_step: float) -> tuple[float, float, float]:
+    def predict_pose(
+        self, speed: float, omega: float, time_step: float
+    ) -> tuple[float, float, float]:
         """根据速度预测下一位姿，不修改机器人当前状态。"""
         x, y, yaw = self.__pose
         x += speed * time_step * math.cos(yaw)

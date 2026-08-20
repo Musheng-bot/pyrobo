@@ -32,9 +32,11 @@ def get_mode(config: dict[str, Any]) -> str:
 
 def find_map(name: str) -> Path:
     map_path = Path(name)
-    candidates = [map_path] if map_path.suffix else [
-        MAP_DIR / f"{name}{suffix}" for suffix in SUPPORTED_MAP_SUFFIXES
-    ]
+    candidates = (
+        [map_path]
+        if map_path.suffix
+        else [MAP_DIR / f"{name}{suffix}" for suffix in SUPPORTED_MAP_SUFFIXES]
+    )
     if map_path.parent == Path(".") and map_path.suffix:
         candidates = [MAP_DIR / map_path.name]
 

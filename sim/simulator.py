@@ -199,8 +199,20 @@ class Simulator:
         """
         if self._pygame is None:
             raise RuntimeError("manual control requires the pygame renderer")
-        linear_speed = speed if self._pygame.K_UP in self._manual_keys else -speed if self._pygame.K_DOWN in self._manual_keys else 0.0
-        angular_speed = -omega if self._pygame.K_LEFT in self._manual_keys else omega if self._pygame.K_RIGHT in self._manual_keys else 0.0
+        linear_speed = (
+            speed
+            if self._pygame.K_UP in self._manual_keys
+            else -speed
+            if self._pygame.K_DOWN in self._manual_keys
+            else 0.0
+        )
+        angular_speed = (
+            -omega
+            if self._pygame.K_LEFT in self._manual_keys
+            else omega
+            if self._pygame.K_RIGHT in self._manual_keys
+            else 0.0
+        )
         return linear_speed, angular_speed
 
     def get_lidar(

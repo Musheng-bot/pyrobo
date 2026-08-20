@@ -46,7 +46,11 @@ class Map:
         if data.size == 0:
             raise ValueError("map must not be empty")
 
-        self.data = data.astype(bool, copy=True) if data.dtype == bool else np.asarray(data >= threshold, dtype=bool)
+        self.data = (
+            data.astype(bool, copy=True)
+            if data.dtype == bool
+            else np.asarray(data >= threshold, dtype=bool)
+        )
 
     @staticmethod
     def _read(source: MapInput) -> np.ndarray:
