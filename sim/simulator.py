@@ -308,7 +308,9 @@ class Simulator:
         robot = self.robots[robot_id]
 
         def can_move(pose: tuple[float, float, float]) -> bool:
-            if self.map is not None and not self.map.is_free_circle(pose[0], pose[1], robot.radius):
+            if self.map is not None and not self.map._is_free_circle(
+                pose[0], pose[1], robot.radius
+            ):
                 return False
             for other_id, other in self.robots.items():
                 if other_id == robot_id:

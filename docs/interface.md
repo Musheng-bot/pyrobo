@@ -46,13 +46,7 @@ free = world_map.is_free(x, y)
 
 地图外的位置返回 `False`。
 
-查询带半径机器人的可行位置：
-
-```python
-free = world_map.is_free_circle(x, y, radius)
-```
-
-只要机器人圆形范围接触障碍物或地图边界，就会返回 `False`。这个接口可以直接用于带机器人半径的路径检查，也可以作为地图膨胀的基础。
+地图接口不提供按机器人半径查询可行位置的方法。第二题需要候选人自己根据 `robot.radius` 对障碍物进行膨胀，并使用膨胀后的地图规划路径。
 
 获取地图实际尺寸：
 
@@ -62,13 +56,15 @@ width_m, height_m = world_map.size_meters
 
 ## 二、Simulator 中的机器人接口
 
-导航回调的基本形式是：
+自动导航由初始化函数和周期函数组成：
 
 ```python
-def nav_cbk(sim: Simulator) -> None:
+context = nav_init(sim)
+
+def nav_run(sim: Simulator, context) -> None:
     ...
 
-sim.run(callback=nav_cbk)
+sim.run(callback=lambda sim: nav_run(sim, context))
 ```
 
 每个周期的顺序是：
@@ -78,9 +74,7 @@ sim.run(callback=nav_cbk)
     ↓
 更新机器人位姿和反馈
     ↓
-调用 nav_cbk(sim)
-    ↓
-设置下一周期控制量
+调用 nav_run(sim)
 ```
 
 因此，回调中读取到的是当前周期状态，设置的控制量在下一周期生效。
@@ -227,7 +221,15 @@ sim.set_display_path([])
 ## 五、推荐的导航回调结构
 
 ```python
-def nav_cbk(sim: Simulator) -> None:
+def nav_init(sim: Simulator):
+    # 只执行一次：预处理地图、初始化规划器和控制器
+    planning_map = ...
+    planner = ...
+    controller = ...
+    return planning_map, planner, controller
+
+
+def nav_run(sim: Simulator, context) -> None:
     goal = sim.get_goal()
     pose = sim.get_pose()
     feedback = sim.get_feedback()

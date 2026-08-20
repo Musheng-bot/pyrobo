@@ -3,7 +3,7 @@ from typing import Any
 
 import yaml
 
-from planner.navigation import nav_cbk
+from planner.navigation import nav_init, nav_run
 from sim.simulator import Simulator
 
 
@@ -116,7 +116,15 @@ def main() -> None:
         feedback_vx, feedback_vy = environment.get_feedback()
         _ = feedback_vx, feedback_vy
 
-    callback = manual_control if mode == "manual" else nav_cbk
+    if mode == "auto":
+        navigation_context = nav_init(sim)
+
+        def auto_control(environment: Simulator) -> None:
+            nav_run(environment, navigation_context)
+
+        callback = auto_control
+    else:
+        callback = manual_control
     sim.run(callback=callback)
 
 

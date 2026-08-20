@@ -141,12 +141,9 @@ class Map:
             distance += sample_step
         return float(max_range)
 
-    def is_free_circle(self, x: float, y: float, radius: float) -> bool:
-        """查询圆形机器人是否能放置在 ``(x, y)``。
+    def _is_free_circle(self, x: float, y: float, radius: float) -> bool:
+        """供 Simulator 内部进行圆形机器人碰撞检查。"""
 
-        ``radius`` 单位为米；只要圆形范围接触黑色区域或地图边界，就返回
-        ``False``。该函数用于带半径的机器人碰撞检测。
-        """
         if radius < 0:
             raise ValueError("radius must not be negative")
 
