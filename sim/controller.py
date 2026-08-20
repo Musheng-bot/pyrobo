@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import random
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from sim.robot import Robot
+from sim.kinematics import Kinematics, UnicycleKinematics
+
+if TYPE_CHECKING:
+    from sim.robot import Robot
 
 
 class Controller:
@@ -17,6 +23,7 @@ class Controller:
         speed_noise_std: float = 0.01,
         omega_noise_std: float = 0.05,
         seed: int | None = None,
+        kinematics: Kinematics | None = None,
     ):
         """创建控制器。
 
@@ -33,10 +40,13 @@ class Controller:
         self.speed_noise_std = float(speed_noise_std)
         self.omega_noise_std = float(omega_noise_std)
         self._random = random.Random(seed)
+        self.kinematics = kinematics or UnicycleKinematics()
         self._expected_speed = 0.0
         self._expected_omega = 0.0
         self._feedback_speed = 0.0
         self._feedback_omega = 0.0
+        self._feedback_vx = 0.0
+        self._feedback_vy = 0.0
 
     def set_control(self, speed: float, omega: float) -> None:
         """设置下一次仿真周期使用的期望线速度和角速度。
@@ -46,6 +56,10 @@ class Controller:
         """
         self._expected_speed = float(speed)
         self._expected_omega = float(omega)
+
+    def set_kinematics(self, kinematics: Kinematics) -> None:
+        """替换控制指令所使用的运动学模型。"""
+        self.kinematics = kinematics
 
     def get_control(self) -> tuple[float, float]:
         """获取当前期望控制量，返回 ``(speed, omega)``。"""
@@ -58,19 +72,35 @@ class Controller:
 
         ``can_move`` 是可选的碰撞检查函数，接收预测位姿并返回是否允许移动。
         """
-        speed = self._expected_speed + self._random.gauss(0.0, self.speed_noise_std)
-        omega = self._expected_omega + self._random.gauss(0.0, self.omega_noise_std)
-        self._feedback_speed, self._feedback_omega = self.robot.move(
-            speed,
-            omega,
-            self.time_step,
-            can_move=can_move,
+        command = self.kinematics.add_noise(
+            self.get_control(),
+            self._random,
+            self.speed_noise_std,
+            self.omega_noise_std,
         )
+        next_pose = self.kinematics.predict_pose(
+            self.robot.pose, command, self.time_step
+        )
+        if can_move is not None and not can_move(next_pose):
+            command = self.kinematics.blocked_command(command)
+            next_pose = self.kinematics.predict_pose(
+                self.robot.pose, command, self.time_step
+            )
+
+        self._feedback_speed, self._feedback_omega = command
+        self._feedback_vx, self._feedback_vy, self._feedback_omega = (
+            self.kinematics.feedback(command)
+        )
+        self.robot._commit_pose(next_pose)
         return self.get_feedback()
 
     def get_feedback(self) -> tuple[float, float]:
         """获取最近一个仿真周期的实际反馈 ``(speed, omega)``。"""
         return self._feedback_speed, self._feedback_omega
+
+    def get_vector_feedback(self) -> tuple[float, float, float]:
+        """获取最近周期的 ``(vx, vy, omega)`` 反馈。"""
+        return self._feedback_vx, self._feedback_vy, self._feedback_omega
 
     # Compatibility aliases for the original API.
     set_target = set_control

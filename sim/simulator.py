@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from sim.controller import Controller
+from sim.kinematics import Kinematics
 from sim.map import Map, MapInput
 from sim.robot import Robot
 
@@ -36,9 +37,10 @@ class Simulator:
         speed_noise_std: float = 0.01,
         omega_noise_std: float = 0.05,
         seed: int | None = None,
+        kinematics: Kinematics | None = None,
         robot_radius: float = 0.05,
         render: bool = True,
-        window_scale: int = 48,
+        window_scale: int | None = None,
     ):
         """创建仿真环境。
 
@@ -47,7 +49,7 @@ class Simulator:
         """
         if time_step <= 0:
             raise ValueError("time_step must be greater than zero")
-        if window_scale <= 0:
+        if window_scale is not None and window_scale <= 0:
             raise ValueError("window_scale must be greater than zero")
 
         self.time_step = float(time_step)
@@ -68,6 +70,7 @@ class Simulator:
             speed_noise_std=speed_noise_std,
             omega_noise_std=omega_noise_std,
             seed=seed,
+            kinematics=kinematics,
         )
         self.robot = self.robots["robot"]
         self.controller = self.controllers["robot"]
@@ -90,6 +93,7 @@ class Simulator:
         speed_noise_std: float = 0.01,
         omega_noise_std: float = 0.05,
         seed: int | None = None,
+        kinematics: Kinematics | None = None,
     ) -> str:
         """添加机器人并返回其名称。
 
@@ -105,17 +109,18 @@ class Simulator:
         if not name or name in self._agents:
             raise ValueError(f"robot name is invalid or already exists: {name!r}")
 
-        robot = Robot(pose=pose, radius=radius)
-        controller = Controller(
-            robot,
-            self.time_step,
+        robot = Robot(
+            pose=pose,
+            radius=radius,
+            time_step=self.time_step,
             speed_noise_std=speed_noise_std,
             omega_noise_std=omega_noise_std,
             seed=seed,
+            kinematics=kinematics,
         )
         self.robots[name] = robot
-        self.controllers[name] = controller
-        self._agents[name] = _RobotAgent(robot, controller)
+        self.controllers[name] = robot.controller
+        self._agents[name] = _RobotAgent(robot, robot.controller)
         return name
 
     def remove_robot(self, name: str) -> None:
@@ -150,6 +155,10 @@ class Simulator:
     def get_feedback(self, robot_id: str = "robot") -> tuple[float, float]:
         """获取最近一个仿真周期的实际 ``(speed, omega)`` 反馈。"""
         return self.controllers[robot_id].get_feedback()
+
+    def get_vector_feedback(self, robot_id: str = "robot") -> tuple[float, float, float]:
+        """获取最近周期的 ``(vx, vy, omega)`` 反馈。"""
+        return self.controllers[robot_id].get_vector_feedback()
 
     def get_pose(self, robot_id: str = "robot") -> tuple[float, float, float]:
         """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
@@ -189,7 +198,7 @@ class Simulator:
 
     def get_manual_control(
         self,
-        speed: float = 0.1,
+        speed: float = 1.0,
         omega: float = 1.5,
     ) -> tuple[float, float]:
         """读取 pygame 键盘输入并返回 ``(speed, omega)``。
@@ -207,9 +216,9 @@ class Simulator:
             else 0.0
         )
         angular_speed = (
-            -omega
+            omega
             if self._pygame.K_LEFT in self._manual_keys
-            else omega
+            else -omega
             if self._pygame.K_RIGHT in self._manual_keys
             else 0.0
         )
@@ -249,7 +258,7 @@ class Simulator:
             raise KeyError(f"unknown robot: {robot_id}")
         feedback: dict[str, tuple[float, float]] = {}
         for name, agent in self._agents.items():
-            feedback[name] = agent.controller.step(self._can_move(name))
+            feedback[name] = agent.robot.controller.step(self._can_move(name))
         return feedback[robot_id]
 
     def _can_move(self, robot_id: str) -> Callable[[tuple[float, float, float]], bool] | None:
@@ -300,7 +309,8 @@ class Simulator:
                     callback(self)
                 if self.render_enabled:
                     self._draw()
-                    self._clock.tick(max(1, round(1.0 / self.time_step)))
+                    if self._clock is not None:
+                        self._clock.tick(max(1, round(1.0 / self.time_step)))
                 else:
                     time.sleep(self.time_step)
         finally:
@@ -331,6 +341,16 @@ class Simulator:
         pygame.init()
         height, width = self.map.shape
         panel_width = 280
+        if self.window_scale is None:
+            display_info = pygame.display.Info()
+            horizontal_margin = 40
+            vertical_margin = 80
+            available_width = max(1, display_info.current_w - panel_width - horizontal_margin)
+            available_height = max(1, display_info.current_h - vertical_margin)
+            self.window_scale = max(
+                1,
+                min(available_width // width, available_height // height),
+            )
         self._pygame = pygame
         self._screen = pygame.display.set_mode(
             (width * self.window_scale + panel_width, height * self.window_scale)
@@ -413,12 +433,19 @@ class Simulator:
                 radius_pixels = max(1, round(robot.radius / world_map.resolution * cell))
                 color = (220, 55, 55) if index == 0 else (230, 130, 35)
                 pygame.draw.circle(screen, color, center, radius_pixels)
-                heading_length = cell * 0.45
+                heading_length = max(10, round(radius_pixels * 1.4))
                 heading_end = (
                     round(center[0] + heading_length * math.cos(yaw)),
                     round(center[1] - heading_length * math.sin(yaw)),
                 )
-                pygame.draw.line(screen, (120, 20, 20), center, heading_end, 3)
+                heading_width = max(2, min(6, round(radius_pixels * 0.18)))
+                pygame.draw.line(
+                    screen,
+                    (255, 245, 180),
+                    center,
+                    heading_end,
+                    heading_width,
+                )
 
         # Keep grid lines as a low-contrast visual aid instead of the main map.
         grid_layer = pygame.Surface((width * cell, height * cell), pygame.SRCALPHA)

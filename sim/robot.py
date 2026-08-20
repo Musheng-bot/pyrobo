@@ -1,5 +1,7 @@
-import math
 from collections.abc import Callable
+
+from sim.controller import Controller
+from sim.kinematics import Kinematics
 
 
 class Robot:
@@ -7,6 +9,11 @@ class Robot:
         self,
         pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
         radius: float = 0.05,
+        time_step: float = 0.05,
+        speed_noise_std: float = 0.01,
+        omega_noise_std: float = 0.05,
+        seed: int | None = None,
+        kinematics: Kinematics | None = None,
     ):
         """创建机器人。
 
@@ -16,7 +23,16 @@ class Robot:
         if radius <= 0:
             raise ValueError("radius must be greater than zero")
         self.radius = float(radius)
+        self.__pose = (0.0, 0.0, 0.0)
         self.reset(pose)
+        self.controller = Controller(
+            self,
+            time_step,
+            speed_noise_std=speed_noise_std,
+            omega_noise_std=omega_noise_std,
+            seed=seed,
+            kinematics=kinematics,
+        )
 
     def move(
         self,
@@ -30,23 +46,12 @@ class Robot:
         如果 ``can_move`` 判定下一位姿碰撞，机器人不会平移，但仍可以
         原地旋转，因此反馈速度为 0，角速度仍然有效。
         """
-        next_pose = self.predict_pose(speed, omega, time_step)
-        if can_move is not None and not can_move(next_pose):
-            # Keep rotation feedback: a differential-drive robot can turn in place.
-            speed = 0.0
-            next_pose = self.predict_pose(speed, omega, time_step)
-        self.__pose = next_pose
-        return speed, omega
+        self.controller.time_step = float(time_step)
+        self.controller.set_control(speed, omega)
+        return self.controller.step(can_move)
 
-    def predict_pose(
-        self, speed: float, omega: float, time_step: float
-    ) -> tuple[float, float, float]:
-        """根据速度预测下一位姿，不修改机器人当前状态。"""
-        x, y, yaw = self.__pose
-        x += speed * time_step * math.cos(yaw)
-        y += speed * time_step * math.sin(yaw)
-        yaw += omega * time_step
-        return x, y, yaw
+    def _commit_pose(self, pose: tuple[float, float, float]) -> None:
+        self.__pose = tuple(float(value) for value in pose)
 
     @property
     def pose(self) -> tuple[float, float, float]:
@@ -57,4 +62,4 @@ class Robot:
         """将机器人位姿重置为 ``(x, y, yaw)``。"""
         if len(pose) != 3:
             raise ValueError("pose must contain exactly three values")
-        self.__pose = tuple(float(value) for value in pose)
+        self.__pose = pose

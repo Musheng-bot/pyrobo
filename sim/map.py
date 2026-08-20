@@ -1,7 +1,7 @@
-import numpy as np
 from pathlib import Path
 from typing import TypeAlias
 
+import numpy as np
 
 MapInput: TypeAlias = np.ndarray | str | Path
 

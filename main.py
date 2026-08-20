@@ -47,8 +47,33 @@ def find_map(name: str) -> Path:
     raise FileNotFoundError(f"map {name!r} was not found in {MAP_DIR} ({supported})")
 
 
-def setup_funcs(sim: Simulator) -> None:
-    sim.robot.reset((0.15, 0.15, 0.0))
+def get_robot_config(config: dict[str, Any]) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    pyrobo = config.get("pyrobo")
+    robot = pyrobo.get("robot") if isinstance(pyrobo, dict) else None
+    if not isinstance(robot, dict):
+        raise ValueError("config must define pyrobo.robot")
+
+    initial = robot.get("initial")
+    goal = robot.get("goal")
+    if not isinstance(initial, dict) or not isinstance(goal, dict):
+        raise ValueError("config must define pyrobo.robot.initial and pyrobo.robot.goal")
+
+    try:
+        initial_pose = (
+            float(initial["x"]),
+            float(initial["y"]),
+            float(initial["yaw"]),
+        )
+        goal_pose = (
+            float(goal["x"]),
+            float(goal["y"]),
+            float(goal["yaw"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            "robot.initial and robot.goal must define numeric x, y and yaw"
+        ) from error
+    return initial_pose, goal_pose
 
 
 def auto_control(sim: Simulator) -> tuple[float, float]:
@@ -63,6 +88,7 @@ def main() -> None:
         raise ValueError("config must define a pyrobo mapping")
 
     mode = get_mode(config)
+    initial_pose, goal = get_robot_config(config)
     map_config = pyrobo.get("map")
     if not isinstance(map_config, dict) or "name" not in map_config:
         raise ValueError("config must define pyrobo.map.name")
@@ -79,7 +105,8 @@ def main() -> None:
         seed=42,
         render=True,
     )
-    setup_funcs(sim)
+    sim.robot.reset(initial_pose)
+    sim.set_goal(goal)
 
     def control_loop(environment: Simulator) -> None:
         if mode == "manual":

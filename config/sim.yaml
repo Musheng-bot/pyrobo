@@ -2,19 +2,28 @@ meta:
   author: Musheng-bot
   email: meisoren081@gmail.com
 pyrobo:
-  robot_radius: 0.025 # meter
-  time_step: 0.05    # seconds
+  robot_radius: 0.3 # meter
+  time_step: 0.05 # seconds
   map:
-    origin_x: 0.0    # meter
-    origin_y: 0.0    # meter
+    origin_x: 0.0 # meter
+    origin_y: 0.0 # meter
     resolution: 0.05 # meter / pixel
-    name: "demo_map" # `map/*.pgm` or `map/*.png`
+    name: "map" # `map/*.pgm` or `map/*.png`
   control:
-    mode: manual      # `manual` or `auto`
-    speed_max: 2.0    # meter / second; absolute value
-    speed_min: 0.0    # meter / second; absolute value
-    acc_max: 1.0      # meter / second^2; not absolute value
-    acc_min: -1.0     # meter / second^2; not absolute value
+    mode: manual # `manual` or `auto`
+    speed_max: 2.0 # meter / second; absolute value
+    speed_min: 0.0 # meter / second; absolute value
+    acc_max: 1.0 # meter / second^2; not absolute value
+    acc_min: -1.0 # meter / second^2; not absolute value
     angular_max: 3.14 # rad / second; absolute value
-    angular_min: 0.0  # rad / second; absolute value
-    allow_reverse: false
+    angular_min: 0.0 # rad / second; absolute value
+    allow_reverse: false # unused
+  robot:
+    initial:
+      x: 0.50
+      y: 0.50
+      yaw: 0.0
+    goal:
+      x: 9.50
+      y: 7.50
+      yaw: 0.0
