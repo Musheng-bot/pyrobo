@@ -206,6 +206,16 @@ front_distance = ranges[len(ranges) // 2]
 ranges = sim.get_lidar(robot_id="robot_2")
 ```
 
+雷达命中点的界面显示可以通过配置控制：
+
+```yaml
+pyrobo:
+  display:
+    show_lidar: true
+```
+
+关闭 `show_lidar` 只会关闭可视化，不会关闭 `sim.get_lidar()` 数据接口。
+
 ## 四、显示规划路径
 
 ```python

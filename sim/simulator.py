@@ -42,6 +42,7 @@ class Simulator:
         control_config: dict[str, Any] | None = None,
         robot_radius: float = 0.05,
         render: bool = True,
+        show_lidar: bool = True,
         window_scale: int | None = None,
     ):
         """创建仿真环境。
@@ -78,12 +79,17 @@ class Simulator:
         self.robot = self.robots["robot"]
         self.controller = self.controllers["robot"]
         self.render_enabled = render
+        self.show_lidar = bool(show_lidar)
         self.window_scale = window_scale
         self.is_running = False
         self._pygame = None
         self._screen = None
         self._font = None
         self._clock = None
+        self._map_surface = None
+        self._grid_layer = None
+        self._draw_frame = 0
+        self._lidar_display_points: dict[str, list[tuple[int, int]]] = {}
         self._display_path: list[WorldPoint] = []
         self._goal: tuple[float, float, float] | None = None
         self._manual_keys: set[int] = set()
@@ -397,6 +403,38 @@ class Simulator:
         self._screen = pygame.display.set_mode(
             (width * self.window_scale + panel_width, height * self.window_scale)
         )
+        self._map_surface = pygame.Surface(
+            (width * self.window_scale, height * self.window_scale)
+        )
+        for row in range(height):
+            for column in range(width):
+                color = (242, 242, 242) if self.map.data[row, column] else (20, 20, 22)
+                pygame.draw.rect(
+                    self._map_surface,
+                    color,
+                    (
+                        column * self.window_scale,
+                        row * self.window_scale,
+                        self.window_scale,
+                        self.window_scale,
+                    ),
+                )
+
+        self._grid_layer = pygame.Surface(self._map_surface.get_size(), pygame.SRCALPHA)
+        for column in range(width + 1):
+            pygame.draw.line(
+                self._grid_layer,
+                (150, 150, 150, 55),
+                (column * self.window_scale, 0),
+                (column * self.window_scale, height * self.window_scale),
+            )
+        for row in range(height + 1):
+            pygame.draw.line(
+                self._grid_layer,
+                (150, 150, 150, 55),
+                (0, row * self.window_scale),
+                (width * self.window_scale, row * self.window_scale),
+            )
         pygame.display.set_caption("PyRobo Simulator")
         self._font = pygame.font.Font(None, 24)
         self._clock = pygame.time.Clock()
@@ -445,11 +483,7 @@ class Simulator:
         cell = self.window_scale
         height, width = world_map.shape
         screen.fill((35, 40, 48))
-
-        for row in range(height):
-            for column in range(width):
-                color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
-                pygame.draw.rect(screen, color, (column * cell, row * cell, cell, cell))
+        screen.blit(self._map_surface, (0, 0))
 
         if len(self._display_path) >= 2:
             pygame.draw.lines(
@@ -466,6 +500,36 @@ class Simulator:
             pygame.draw.circle(screen, (245, 190, 40), self._world_to_screen(self._goal[:2]), 9, 3)
 
         map_width_m, map_height_m = world_map.size_meters
+        lidar_count = 360
+        lidar_max_range = 3.0
+        if self.show_lidar and self._draw_frame % 2 == 0:
+            self._lidar_display_points = {}
+            for robot_id, robot in self.robots.items():
+                x, y, yaw = robot.pose
+                lidar_ranges = self.get_lidar(
+                    robot_id=robot_id,
+                    count=lidar_count,
+                    max_range=lidar_max_range,
+                )
+                points = []
+                for index, distance in enumerate(lidar_ranges):
+                    if distance >= lidar_max_range:
+                        continue
+                    angle = yaw - math.pi + index * 2 * math.pi / lidar_count
+                    hit_point = (
+                        x + distance * math.cos(angle),
+                        y + distance * math.sin(angle),
+                    )
+                    hit_screen = self._world_to_screen(hit_point)
+                    if 0 <= hit_screen[0] < width * cell and 0 <= hit_screen[1] < height * cell:
+                        points.append(hit_screen)
+                self._lidar_display_points[robot_id] = points
+
+        if self.show_lidar:
+            for points in self._lidar_display_points.values():
+                for point in points:
+                    pygame.draw.circle(screen, (60, 220, 240), point, 2)
+
         for index, (robot_id, robot) in enumerate(self.robots.items()):
             x, y, yaw = robot.pose
             screen_x = (x - world_map.origin[0]) / map_width_m * width * cell
@@ -490,22 +554,7 @@ class Simulator:
                 )
 
         # Keep grid lines as a low-contrast visual aid instead of the main map.
-        grid_layer = pygame.Surface((width * cell, height * cell), pygame.SRCALPHA)
-        for column in range(width + 1):
-            pygame.draw.line(
-                grid_layer,
-                (150, 150, 150, 55),
-                (column * cell, 0),
-                (column * cell, height * cell),
-            )
-        for row in range(height + 1):
-            pygame.draw.line(
-                grid_layer,
-                (150, 150, 150, 55),
-                (0, row * cell),
-                (width * cell, row * cell),
-            )
-        screen.blit(grid_layer, (0, 0))
+        screen.blit(self._grid_layer, (0, 0))
 
         panel_x = width * cell
         pygame.draw.rect(screen, (35, 40, 48), (panel_x, 0, 280, screen.get_height()))
@@ -537,6 +586,7 @@ class Simulator:
             screen.blit(self._font.render(line, True, color), (panel_x + 18, 18 + index * 24))
 
         pygame.display.flip()
+        self._draw_frame += 1
 
     def _close_renderer(self) -> None:
         self._pygame.quit()
@@ -544,4 +594,8 @@ class Simulator:
         self._screen = None
         self._font = None
         self._clock = None
+        self._map_surface = None
+        self._grid_layer = None
+        self._draw_frame = 0
+        self._lidar_display_points.clear()
         self._manual_keys.clear()

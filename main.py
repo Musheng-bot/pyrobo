@@ -88,6 +88,9 @@ def main() -> None:
     control_config = pyrobo.get("control")
     if not isinstance(control_config, dict):
         raise ValueError("config must define pyrobo.control")
+    display_config = pyrobo.get("display", {})
+    if not isinstance(display_config, dict):
+        raise ValueError("pyrobo.display must be a mapping")
     map_config = pyrobo.get("map")
     if not isinstance(map_config, dict) or "name" not in map_config:
         raise ValueError("config must define pyrobo.map.name")
@@ -104,6 +107,7 @@ def main() -> None:
         seed=42,
         control_config=control_config,
         render=True,
+        show_lidar=bool(display_config.get("show_lidar", True)),
     )
     sim.robot.reset(initial_pose)
     sim.set_goal(goal)

@@ -7,10 +7,6 @@ class Planner:
         self.map = robo_map
         self.sim = sim
 
-    @property
-    def robot_pose(self) -> tuple[float, float, float]:
-        return self.sim.robot.pose
-
 
 class PathPlanner(Planner):
     def __init__(self, robo_map: Map, sim: Simulator) -> None:

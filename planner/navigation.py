@@ -19,7 +19,6 @@ def nav_init(sim: Simulator) -> NavigationContext:
     """自动导航初始化，只在仿真开始前调用一次。"""
     if sim.map is None:
         raise ValueError("navigation requires a map")
-    # 候选人应在这里根据 sim.get_robot().radius 生成膨胀后的 planning_map。
     planning_map = sim.map
     return NavigationContext(
         planning_map=planning_map,
@@ -39,7 +38,6 @@ def nav_run(sim: Simulator, context: NavigationContext) -> None:
     path = context.planner.plan()
     sim.set_display_path(path)
 
-    # 这里根据 path、机器人位姿和反馈计算下一周期控制量。
     vx, vy = follow_path(sim, path, context.controller)
     sim.set_control(vx, vy)
 
