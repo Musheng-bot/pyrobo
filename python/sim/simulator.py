@@ -1,7 +1,9 @@
 import math
+import os
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from sim.controller import ControlLimits, Controller
@@ -596,19 +598,8 @@ class Simulator:
             overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             screen.blit(overlay, (0, 0))
-            font_candidates = (
-                "microsoftyahei",
-                "simhei",
-                "notosanscjk",
-                "wenquanyi",
-            )
-            available_fonts = set(pygame.font.get_fonts())
-            font_name = next(
-                (name for name in font_candidates if name in available_fonts),
-                None,
-            )
-            message_font = pygame.font.SysFont(font_name, 48)
-            detail_font = pygame.font.SysFont(font_name, 24)
+            message_font = self._load_message_font(pygame, 48)
+            detail_font = self._load_message_font(pygame, 24)
             message = message_font.render("到达终点", True, (120, 255, 150))
             detail = detail_font.render(
                 f"程序将在 {remaining} 秒后关闭", True, (255, 255, 255)
@@ -624,6 +615,27 @@ class Simulator:
 
         pygame.display.flip()
         self._draw_frame += 1
+
+    @staticmethod
+    def _load_message_font(pygame: Any, size: int) -> Any:
+        """Load a CJK-capable font without pygame's Windows font enumeration."""
+        windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+        candidates = (
+            windows_fonts / "msyh.ttc",
+            windows_fonts / "simhei.ttf",
+            windows_fonts / "simsun.ttc",
+            Path("/System/Library/Fonts/PingFang.ttc"),
+            Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
+            Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+            Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+        )
+        for candidate in candidates:
+            if candidate.is_file():
+                try:
+                    return pygame.font.Font(str(candidate), size)
+                except pygame.error:
+                    continue
+        return pygame.font.Font(None, size)
 
     def _close_renderer(self) -> None:
         self._pygame.quit()
