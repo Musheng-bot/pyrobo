@@ -112,7 +112,6 @@ def main() -> None:
         map_origin=(float(map_config["origin_x"]), float(map_config["origin_y"])),
         robot_radius=float(pyrobo["robot_radius"]),
         speed_noise_std=0.01,
-        omega_noise_std=0.05,
         seed=42,
         control_config=control_config,
         render=True,

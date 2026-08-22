@@ -47,6 +47,6 @@ def follow_path(
     path: list[tuple[float, float]],
     controller: PathController,
 ) -> tuple[float, float]:
-    """根据路径计算下一周期的机器人坐标系速度 ``(vx, vy)``。"""
+    """根据路径计算下一周期的地图坐标系速度 ``(vx, vy)``。"""
     controller.set_path(path)
     return controller.plan()

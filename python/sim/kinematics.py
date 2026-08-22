@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import random
 from abc import ABC, abstractmethod
 
@@ -22,7 +21,6 @@ class Kinematics(ABC):
         command: Command,
         random_source: random.Random,
         speed_noise_std: float,
-        omega_noise_std: float,
     ) -> Command:
         """为控制指令添加符合该模型含义的噪声。"""
 
@@ -36,14 +34,14 @@ class Kinematics(ABC):
 
 
 class HolonomicKinematics(Kinematics):
-    """全向轮模型，指令为机器人坐标系下的 ``(vx, vy)``。"""
+    """全向轮模型，指令为地图坐标系下的 ``(vx, vy)``。"""
 
     def predict_pose(self, pose: Pose, command: Command, time_step: float) -> Pose:
         x, y, yaw = pose
         vx, vy = command
         return (
-            x + (vx * math.cos(yaw) - vy * math.sin(yaw)) * time_step,
-            y + (vx * math.sin(yaw) + vy * math.cos(yaw)) * time_step,
+            x + vx * time_step,
+            y + vy * time_step,
             yaw,
         )
 
@@ -52,7 +50,6 @@ class HolonomicKinematics(Kinematics):
         command: Command,
         random_source: random.Random,
         speed_noise_std: float,
-        omega_noise_std: float,
     ) -> Command:
         vx, vy = command
         return (

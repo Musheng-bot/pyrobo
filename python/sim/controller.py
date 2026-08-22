@@ -54,7 +54,7 @@ class ControlLimits:
 class Controller:
     """控制器：接收期望控制量，加入噪声，并保存机器人反馈。
 
-    当前默认控制量为机器人坐标系下的 `(vx, vy)`，单位为 m/s。
+    当前默认控制量为地图坐标系下的 `(vx, vy)`，单位为 m/s。
     """
 
     def __init__(
@@ -62,25 +62,23 @@ class Controller:
         robot: Robot,
         time_step: float,
         speed_noise_std: float = 0.01,
-        omega_noise_std: float = 0.05,
         seed: int | None = None,
         kinematics: Kinematics | None = None,
         limits: ControlLimits | None = None,
     ):
         """创建控制器。
 
-        ``speed_noise_std`` 和 ``omega_noise_std`` 分别是线速度、角速度
-        高斯噪声的标准差。设置 ``seed`` 后可以复现实验结果。
+        ``speed_noise_std`` 是速度高斯噪声的标准差。设置 ``seed`` 后可以
+        复现实验结果。
         """
         if time_step <= 0:
             raise ValueError("time_step must be greater than zero")
-        if speed_noise_std < 0 or omega_noise_std < 0:
-            raise ValueError("noise standard deviations must not be negative")
+        if speed_noise_std < 0:
+            raise ValueError("speed noise standard deviation must not be negative")
 
         self.robot = robot
         self.time_step = time_step
         self.speed_noise_std = float(speed_noise_std)
-        self.omega_noise_std = float(omega_noise_std)
         self._random = random.Random(seed)
         self.kinematics = kinematics or HolonomicKinematics()
         self.limits = limits
@@ -121,7 +119,6 @@ class Controller:
             self.get_control(),
             self._random,
             self.speed_noise_std,
-            self.omega_noise_std,
         )
         if self.limits is not None:
             command = self.limits.apply(

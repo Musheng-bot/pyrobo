@@ -35,5 +35,5 @@ class Controller(Planner):
         self.path = path
 
     def plan(self) -> tuple[float, float]:
-        """Returns speed and omega value"""
+        """返回地图坐标系下的 ``(vx, vy)`` 速度。"""
         raise NotImplementedError

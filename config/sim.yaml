@@ -10,26 +10,17 @@ pyrobo:
     resolution: 0.05 # meter / pixel
     name: "map" # `map/*.pgm` or `map/*.png`
   control:
-    mode: auto # `manual` or `auto`
-    command_type: vx_vy # candidate may implement another model in sim
-    vx_vy:
+    mode: maunal # `manual` or `auto`
+    dynamics:
       vx_max: 1.5
       vx_min: 0.0
       vy_max: 1.5
       vy_min: 0.0
       acc_max: 1.0 # meter / second^2; not absolute value
       acc_min: -1.0 # meter / second^2; not absolute value
-    v_omega:
-      speed_max: 2.0 # meter / second; absolute value
-      speed_min: 0.0 # meter / second; absolute value
-      acc_max: 1.0 # meter / second^2; not absolute value
-      acc_min: -1.0 # meter / second^2; not absolute value
-      omega_max: 3.14
-      omega_min: 0.0
-
-    allow_reverse: false # unused
   display:
     show_lidar: false
+    show_planning_map: false # if false, show original map; else show planning map
   robot:
     initial:
       x: 0.50

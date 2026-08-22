@@ -12,6 +12,8 @@ from sim.robot import Robot
 
 ControlCallback = Callable[["Simulator"], None]
 WorldPoint = tuple[float, float]
+GOAL_TOLERANCE = 0.25
+GOAL_CLOSE_DELAY = 10.0
 
 
 @dataclass
@@ -36,7 +38,6 @@ class Simulator:
         map_resolution: float = 1.0,
         map_origin: tuple[float, float] = (0.0, 0.0),
         speed_noise_std: float = 0.01,
-        omega_noise_std: float = 0.05,
         seed: int | None = None,
         kinematics: Kinematics | None = None,
         control_config: dict[str, Any] | None = None,
@@ -72,7 +73,6 @@ class Simulator:
             pose=(0.0, 0.0, 0.0),
             radius=robot_radius,
             speed_noise_std=speed_noise_std,
-            omega_noise_std=omega_noise_std,
             seed=seed,
             kinematics=kinematics,
         )
@@ -92,6 +92,9 @@ class Simulator:
         self._lidar_display_points: dict[str, list[tuple[int, int]]] = {}
         self._display_path: list[WorldPoint] = []
         self._goal: tuple[float, float, float] | None = None
+        self._goal_reached = False
+        self._goal_reached_at: float | None = None
+        self._goal_close_deadline: float | None = None
         self._manual_keys: set[int] = set()
 
     def add_robot(
@@ -100,7 +103,6 @@ class Simulator:
         pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
         radius: float = 0.05,
         speed_noise_std: float = 0.01,
-        omega_noise_std: float = 0.05,
         seed: int | None = None,
         kinematics: Kinematics | None = None,
     ) -> str:
@@ -123,7 +125,6 @@ class Simulator:
             radius=radius,
             time_step=self.time_step,
             speed_noise_std=speed_noise_std,
-            omega_noise_std=omega_noise_std,
             seed=seed,
             kinematics=kinematics,
             limits=self.control_limits,
@@ -139,29 +140,17 @@ class Simulator:
     ) -> ControlLimits | None:
         if control_config is None:
             return None
-        command_type = control_config.get("command_type", "vx_vy")
-        profile = control_config.get(command_type)
+        profile = control_config.get("dynamics")
         if not isinstance(profile, dict):
-            raise ValueError(f"control config must define a {command_type!r} profile")
-
-        if command_type == "vx_vy":
-            maximum_keys = ("vx_max", "vy_max")
-            minimum_keys = ("vx_min", "vy_min")
-        elif command_type == "v_omega":
-            maximum_keys = ("speed_max", "omega_max")
-            minimum_keys = ("speed_min", "omega_min")
-        else:
-            raise ValueError(f"unsupported control command type: {command_type!r}")
+            raise ValueError("control config must define a dynamics mapping")
 
         try:
-            maximum = tuple(float(profile[key]) for key in maximum_keys)
-            minimum = tuple(float(profile[key]) for key in minimum_keys)
+            maximum = (float(profile["vx_max"]), float(profile["vy_max"]))
+            minimum = (float(profile["vx_min"]), float(profile["vy_min"]))
             acceleration_max = float(profile["acc_max"])
             acceleration_min = float(profile["acc_min"])
         except (KeyError, TypeError, ValueError) as error:
-            raise ValueError(
-                f"invalid control limits for command type {command_type!r}"
-            ) from error
+            raise ValueError("invalid control limits in control.dynamics") from error
         return ControlLimits(
             maximum=maximum,  # type: ignore[arg-type]
             minimum=minimum,  # type: ignore[arg-type]
@@ -220,6 +209,9 @@ class Simulator:
             raise ValueError("goal must contain (x, y) or (x, y, yaw)")
         yaw = float(goal[2]) if len(goal) == 3 else 0.0
         self._goal = (float(goal[0]), float(goal[1]), yaw)
+        self._goal_reached = False
+        self._goal_reached_at = None
+        self._goal_close_deadline = None
 
     def get_goal(self) -> tuple[float, float, float] | None:
         """获取当前目标点；没有设置目标时返回 ``None``。"""
@@ -229,6 +221,9 @@ class Simulator:
         """清除目标点和当前显示路径。"""
         self._goal = None
         self._display_path = []
+        self._goal_reached = False
+        self._goal_reached_at = None
+        self._goal_close_deadline = None
 
     def set_display_path(self, path: Iterable[WorldPoint]) -> None:
         """设置要在 pygame 中显示的世界坐标路径。
@@ -247,28 +242,28 @@ class Simulator:
         speed: float = 1.0,
         lateral_speed: float = 1.0,
     ) -> tuple[float, float]:
-        """读取 WASD 键盘输入并返回机器人坐标系下的 ``(vx, vy)``。
+        """读取 WASD 键盘输入并返回地图坐标系下的 ``(vx, vy)``。
 
         该函数只读取输入，不会自动设置控制量；调用方仍需把返回值传给
-        :meth:`set_control`。W/S 对应前进和后退，A/D 对应左移和右移。
+        :meth:`set_control`。A/D 控制地图 x 轴，W/S 控制地图 y 轴。
         """
         if self._pygame is None:
             raise RuntimeError("manual control requires the pygame renderer")
-        linear_speed = (
+        x_velocity = (
+            -lateral_speed
+            if self._pygame.K_a in self._manual_keys
+            else lateral_speed
+            if self._pygame.K_d in self._manual_keys
+            else 0.0
+        )
+        y_velocity = (
             speed
             if self._pygame.K_w in self._manual_keys
             else -speed
             if self._pygame.K_s in self._manual_keys
             else 0.0
         )
-        lateral_velocity = (
-            lateral_speed
-            if self._pygame.K_a in self._manual_keys
-            else -lateral_speed
-            if self._pygame.K_d in self._manual_keys
-            else 0.0
-        )
-        return linear_speed, lateral_velocity
+        return x_velocity, y_velocity
 
     def get_lidar(
         self,
@@ -351,9 +346,17 @@ class Simulator:
                 if not self.is_running:
                     break
 
-                self.step()
+                if not self._goal_reached and self._has_reached_goal():
+                    self._mark_goal_reached()
+
+                if self._goal_reached:
+                    self.set_control(0.0, 0.0)
+                else:
+                    self.step()
+                    if self._has_reached_goal():
+                        self._mark_goal_reached()
                 elapsed += self.time_step
-                if callback is not None:
+                if callback is not None and not self._goal_reached:
                     callback(self)
                 if self.render_enabled:
                     self._draw()
@@ -361,6 +364,11 @@ class Simulator:
                         self._clock.tick(max(1, round(1.0 / self.time_step)))
                 else:
                     time.sleep(self.time_step)
+                if (
+                    self._goal_close_deadline is not None
+                    and time.monotonic() >= self._goal_close_deadline
+                ):
+                    self.stop()
         finally:
             self.is_running = False
             if self.render_enabled:
@@ -369,6 +377,21 @@ class Simulator:
     def stop(self) -> None:
         """停止持续运行的仿真循环。"""
         self.is_running = False
+
+    def _has_reached_goal(self) -> bool:
+        if self._goal is None:
+            return False
+        x, y, _ = self.robot.pose
+        goal_x, goal_y, _ = self._goal
+        return math.hypot(x - goal_x, y - goal_y) <= GOAL_TOLERANCE
+
+    def _mark_goal_reached(self) -> None:
+        if self._goal_reached:
+            return
+        self._goal_reached = True
+        self._goal_reached_at = time.monotonic()
+        self._goal_close_deadline = self._goal_reached_at + GOAL_CLOSE_DELAY
+        self.set_control(0.0, 0.0)
 
     def _init_renderer(self) -> None:
         import warnings
@@ -584,6 +607,37 @@ class Simulator:
         for index, line in enumerate(lines):
             color = (255, 220, 120) if index == 0 else (235, 235, 235)
             screen.blit(self._font.render(line, True, color), (panel_x + 18, 18 + index * 24))
+
+        if self._goal_reached and self._goal_close_deadline is not None:
+            remaining = max(0, math.ceil(self._goal_close_deadline - time.monotonic()))
+            overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150))
+            screen.blit(overlay, (0, 0))
+            font_candidates = (
+                "microsoftyahei",
+                "simhei",
+                "notosanscjk",
+                "wenquanyi",
+            )
+            available_fonts = set(pygame.font.get_fonts())
+            font_name = next(
+                (name for name in font_candidates if name in available_fonts),
+                None,
+            )
+            message_font = pygame.font.SysFont(font_name, 48)
+            detail_font = pygame.font.SysFont(font_name, 24)
+            message = message_font.render("到达终点", True, (120, 255, 150))
+            detail = detail_font.render(
+                f"程序将在 {remaining} 秒后关闭", True, (255, 255, 255)
+            )
+            screen.blit(
+                message,
+                message.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 - 24)),
+            )
+            screen.blit(
+                detail,
+                detail.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 + 30)),
+            )
 
         pygame.display.flip()
         self._draw_frame += 1
