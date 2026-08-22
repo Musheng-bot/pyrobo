@@ -4,6 +4,7 @@ project(PyRoboCppInterface LANGUAGES CXX)
 
 add_library(pyrobo_contestant SHARED
     src/c_api.cpp
+    src/planner.cpp
     src/contestant.cpp
 )
 
