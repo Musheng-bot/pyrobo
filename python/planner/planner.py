@@ -13,8 +13,8 @@ class PathPlanner(Planner):
         super().__init__(robo_map, sim)
         self.goal: tuple[float, float, float] = self.sim.robot.pose
 
-    def set_goal(self, goal: tuple[float, float, float]) -> None:
-        """设置目标世界位姿，通常由 Simulator 的地图点击触发。"""
+    def update_goal(self, goal: tuple[float, float, float]) -> None:
+        """更新规划器使用的固定目标位姿。"""
         self.goal = goal
 
     def plan(self) -> list[tuple[float, float]]:

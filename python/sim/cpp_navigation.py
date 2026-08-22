@@ -54,14 +54,6 @@ _GetGoal = ctypes.CFUNCTYPE(
     ctypes.POINTER(ctypes.c_double),
     ctypes.POINTER(ctypes.c_double),
 )
-_SetGoal = ctypes.CFUNCTYPE(
-    ctypes.c_int,
-    ctypes.c_void_p,
-    ctypes.c_double,
-    ctypes.c_double,
-    ctypes.c_double,
-)
-_ClearGoal = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p)
 _GetFeedback = ctypes.CFUNCTYPE(
     ctypes.c_int,
     ctypes.c_void_p,
@@ -124,8 +116,6 @@ class _CCallbacks(ctypes.Structure):
         ("get_pose", _GetPose),
         ("get_robot", _GetRobot),
         ("get_goal", _GetGoal),
-        ("set_goal", _SetGoal),
-        ("clear_goal", _ClearGoal),
         ("get_feedback", _GetFeedback),
         ("get_vector_feedback", _GetVectorFeedback),
         ("set_control", _SetControl),
@@ -259,14 +249,6 @@ class CppNavigation:
             x[0], y[0], yaw[0] = goal
             return 1
 
-        def set_goal(_user: object, x: float, y: float, yaw: float) -> int:
-            self._sim.set_goal((x, y, yaw))
-            return 1
-
-        def clear_goal(_user: object) -> int:
-            self._sim.clear_goal()
-            return 1
-
         def get_feedback(
             _user: object,
             robot_id: bytes,
@@ -349,8 +331,6 @@ class CppNavigation:
             (_GetPose, get_pose, 0),
             (_GetRobot, get_robot, 0),
             (_GetGoal, get_goal, -1),
-            (_SetGoal, set_goal, 0),
-            (_ClearGoal, clear_goal, 0),
             (_GetFeedback, get_feedback, 0),
             (_GetVectorFeedback, get_vector_feedback, 0),
             (_SetControl, set_control, 0),

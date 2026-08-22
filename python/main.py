@@ -110,6 +110,7 @@ def main() -> None:
         map_data=map_file,
         map_resolution=float(map_config["resolution"]),
         map_origin=(float(map_config["origin_x"]), float(map_config["origin_y"])),
+        goal=goal,
         robot_radius=float(pyrobo["robot_radius"]),
         speed_noise_std=0.01,
         seed=42,
@@ -119,7 +120,6 @@ def main() -> None:
         show_planning_map=bool(display_config.get("show_planning_map", False)),
     )
     sim.robot.reset(initial_pose)
-    sim.set_goal(goal)
 
     def manual_control(environment: Simulator) -> None:
         vx, vy = environment.get_manual_control()

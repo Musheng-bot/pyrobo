@@ -36,7 +36,7 @@ def nav_run(sim: Simulator, context: NavigationContext) -> None:
         sim.set_control(0.0, 0.0)
         return
     sim.set_planning_map(context.planning_map)
-    context.planner.set_goal(goal)
+    context.planner.update_goal(goal)
     path = context.planner.plan()
     sim.set_display_path(path)
 

@@ -89,20 +89,6 @@ public:
         return present == 0 ? std::nullopt : std::optional<pyrobo::Pose>(goal);
     }
 
-    void set_goal(pyrobo::Point goal) override {
-        set_goal({goal.x, goal.y, 0.0});
-    }
-
-    void set_goal(pyrobo::Pose goal) override {
-        require(callbacks_.set_goal, "set_goal");
-        check(callbacks_.set_goal(callbacks_.user_data, goal.x, goal.y, goal.yaw), "set_goal");
-    }
-
-    void clear_goal() override {
-        require(callbacks_.clear_goal, "clear_goal");
-        check(callbacks_.clear_goal(callbacks_.user_data), "clear_goal");
-    }
-
     pyrobo::Feedback get_feedback(std::string_view robot_id) const override {
         require(callbacks_.get_feedback, "get_feedback");
         const std::string id(robot_id);

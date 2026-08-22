@@ -31,8 +31,6 @@ using pyrobo_callbacks = struct pyrobo_callbacks {
     );
     int (*get_robot)(void* user_data, const char* robot_id, double* radius);
     int (*get_goal)(void* user_data, double* x, double* y, double* yaw);
-    int (*set_goal)(void* user_data, double x, double y, double yaw);
-    int (*clear_goal)(void* user_data);
     int (*get_feedback)(
         void* user_data, const char* robot_id, double* first, double* second
     );

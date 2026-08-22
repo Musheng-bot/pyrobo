@@ -46,6 +46,7 @@ class Simulator:
         show_lidar: bool = True,
         show_planning_map: bool = False,
         window_scale: int | None = None,
+        goal: tuple[float, float] | tuple[float, float, float] | None = None,
     ):
         """创建仿真环境。
 
@@ -99,6 +100,11 @@ class Simulator:
         self._goal_reached_at: float | None = None
         self._goal_close_deadline: float | None = None
         self._manual_keys: set[int] = set()
+        if goal is not None:
+            if len(goal) not in (2, 3):
+                raise ValueError("goal must contain (x, y) or (x, y, yaw)")
+            yaw = float(goal[2]) if len(goal) == 3 else 0.0
+            self._goal = (float(goal[0]), float(goal[1]), yaw)
 
     def add_robot(
         self,
@@ -202,31 +208,9 @@ class Simulator:
         """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
         return self.robots[robot_id].pose
 
-    def set_goal(self, goal: tuple[float, float] | tuple[float, float, float]) -> None:
-        """设置米制世界坐标目标点，pygame 单击地图也会调用此接口。
-
-        目标点只保存在 Simulator 中，由上层导航回调通过 ``get_goal``
-        主动读取和处理。
-        """
-        if len(goal) not in (2, 3):
-            raise ValueError("goal must contain (x, y) or (x, y, yaw)")
-        yaw = float(goal[2]) if len(goal) == 3 else 0.0
-        self._goal = (float(goal[0]), float(goal[1]), yaw)
-        self._goal_reached = False
-        self._goal_reached_at = None
-        self._goal_close_deadline = None
-
     def get_goal(self) -> tuple[float, float, float] | None:
-        """获取当前目标点；没有设置目标时返回 ``None``。"""
+        """获取启动时从配置文件读取的固定目标点。"""
         return self._goal
-
-    def clear_goal(self) -> None:
-        """清除目标点和当前显示路径。"""
-        self._goal = None
-        self._display_path = []
-        self._goal_reached = False
-        self._goal_reached_at = None
-        self._goal_close_deadline = None
 
     def set_display_path(self, path: Iterable[WorldPoint]) -> None:
         """设置要在 pygame 中显示的世界坐标路径。
@@ -485,26 +469,8 @@ class Simulator:
                 self._manual_keys.add(event.key)
                 if event.key == self._pygame.K_ESCAPE:
                     self.stop()
-                elif event.key == self._pygame.K_g:
-                    self._set_goal_from_screen(self._pygame.mouse.get_pos())
             elif event.type == self._pygame.KEYUP:
                 self._manual_keys.discard(event.key)
-            elif event.type == self._pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self._set_goal_from_screen(event.pos)
-
-    def _set_goal_from_screen(self, position: tuple[int, int]) -> None:
-        """将地图窗口像素坐标转换为米制世界目标点。"""
-        if self.map is None:
-            return
-        world_map = self._display_map()
-        height, width = world_map.shape
-        cell = self.window_scale
-        screen_x, screen_y = position
-        if not 0 <= screen_x < width * cell or not 0 <= screen_y < height * cell:
-            return
-        x = world_map.origin[0] + screen_x / cell * world_map.resolution
-        y = world_map.origin[1] + (height - screen_y / cell) * world_map.resolution
-        self.set_goal((x, y, 0.0))
 
     def _world_to_screen(self, point: WorldPoint) -> tuple[int, int]:
         """将米制世界坐标转换为 pygame 窗口像素坐标。"""
@@ -537,7 +503,7 @@ class Simulator:
             pygame.draw.circle(screen, (40, 120, 230), self._world_to_screen(point), 4)
 
         if self._goal is not None:
-            pygame.draw.circle(screen, (245, 190, 40), self._world_to_screen(self._goal[:2]), 9, 3)
+            pygame.draw.circle(screen, (40, 220, 90), self._world_to_screen(self._goal[:2]), 10, 4)
 
         map_width_m, map_height_m = world_map.size_meters
         lidar_count = 360
@@ -618,7 +584,7 @@ class Simulator:
             f"feedback vy: {feedback_vy:.3f} m/s",
             f"path points: {len(self._display_path)}",
             "",
-            "WASD: move    left click / G: set goal",
+            "WASD: move",
             "ESC  close",
         ]
         for index, line in enumerate(lines):

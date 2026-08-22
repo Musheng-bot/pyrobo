@@ -135,9 +135,6 @@ class Simulator {
     virtual RobotInfo get_robot(std::string_view robot_id = "robot") const = 0;
 
     virtual std::optional<Pose> get_goal() const = 0;
-    virtual void set_goal(Point goal) = 0;
-    virtual void set_goal(Pose goal) = 0;
-    virtual void clear_goal() = 0;
 
     virtual Feedback get_feedback(std::string_view robot_id = "robot")
         const = 0;
