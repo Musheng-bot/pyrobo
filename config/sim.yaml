@@ -16,8 +16,8 @@ pyrobo:
       vx_min: 0.0
       vy_max: 1.5
       vy_min: 0.0
-      acc_max: 1.0 # meter / second^2; not absolute value
-      acc_min: -1.0 # meter / second^2; not absolute value
+      acc_max: 1.0 # meter / second^2;
+      acc_min: -1.0 # meter / second^2;
   display:
     show_lidar: false # show lidar points if true
     show_planning_map: false # if false, show original map; else show planning map
