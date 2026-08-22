@@ -44,6 +44,7 @@ class Simulator:
         robot_radius: float = 0.05,
         render: bool = True,
         show_lidar: bool = True,
+        show_planning_map: bool = False,
         window_scale: int | None = None,
     ):
         """创建仿真环境。
@@ -80,6 +81,7 @@ class Simulator:
         self.controller = self.controllers["robot"]
         self.render_enabled = render
         self.show_lidar = bool(show_lidar)
+        self.show_planning_map = bool(show_planning_map)
         self.window_scale = window_scale
         self.is_running = False
         self._pygame = None
@@ -91,6 +93,7 @@ class Simulator:
         self._draw_frame = 0
         self._lidar_display_points: dict[str, list[tuple[int, int]]] = {}
         self._display_path: list[WorldPoint] = []
+        self._planning_map: Map | None = None
         self._goal: tuple[float, float, float] | None = None
         self._goal_reached = False
         self._goal_reached_at: float | None = None
@@ -232,6 +235,19 @@ class Simulator:
         每个点格式为 ``(x, y)``，单位为米。
         """
         self._display_path = [(float(point[0]), float(point[1])) for point in path]
+
+    def set_planning_map(self, planning_map: Map | None) -> None:
+        """设置仅用于显示的规划地图，不影响碰撞检测或雷达。"""
+        if planning_map is not None and not isinstance(planning_map, Map):
+            raise TypeError("planning_map must be a Map or None")
+        self._planning_map = planning_map
+
+    def _display_map(self) -> Map:
+        if self.map is None:
+            raise RuntimeError("display requires map_data")
+        if self.show_planning_map and self._planning_map is not None:
+            return self._planning_map
+        return self.map
 
     def get_display_path(self) -> list[WorldPoint]:
         """获取当前显示的世界坐标路径副本。"""
@@ -407,10 +423,9 @@ class Simulator:
             )
             import pygame
 
-        if self.map is None:
-            raise ValueError("rendering requires map_data")
+        world_map = self._display_map()
         pygame.init()
-        height, width = self.map.shape
+        height, width = world_map.shape
         panel_width = 280
         if self.window_scale is None:
             display_info = pygame.display.Info()
@@ -431,7 +446,7 @@ class Simulator:
         )
         for row in range(height):
             for column in range(width):
-                color = (242, 242, 242) if self.map.data[row, column] else (20, 20, 22)
+                color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
                 pygame.draw.rect(
                     self._map_surface,
                     color,
@@ -481,27 +496,29 @@ class Simulator:
         """将地图窗口像素坐标转换为米制世界目标点。"""
         if self.map is None:
             return
-        height, width = self.map.shape
+        world_map = self._display_map()
+        height, width = world_map.shape
         cell = self.window_scale
         screen_x, screen_y = position
         if not 0 <= screen_x < width * cell or not 0 <= screen_y < height * cell:
             return
-        x = self.map.origin[0] + screen_x / cell * self.map.resolution
-        y = self.map.origin[1] + (height - screen_y / cell) * self.map.resolution
+        x = world_map.origin[0] + screen_x / cell * world_map.resolution
+        y = world_map.origin[1] + (height - screen_y / cell) * world_map.resolution
         self.set_goal((x, y, 0.0))
 
     def _world_to_screen(self, point: WorldPoint) -> tuple[int, int]:
         """将米制世界坐标转换为 pygame 窗口像素坐标。"""
+        world_map = self._display_map()
         x, y = point
-        height, _ = self.map.shape
+        height, _ = world_map.shape
         return (
-            round((x - self.map.origin[0]) / self.map.resolution * self.window_scale),
-            round((height - (y - self.map.origin[1]) / self.map.resolution) * self.window_scale),
+            round((x - world_map.origin[0]) / world_map.resolution * self.window_scale),
+            round((height - (y - world_map.origin[1]) / world_map.resolution) * self.window_scale),
         )
 
     def _draw(self) -> None:
         pygame = self._pygame
-        world_map = self.map
+        world_map = self._display_map()
         screen = self._screen
         cell = self.window_scale
         height, width = world_map.shape

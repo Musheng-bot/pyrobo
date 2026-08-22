@@ -1,5 +1,6 @@
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 #include "pyrobo/interface.hpp"
 #include "pyrobo/planner.h"
@@ -8,10 +9,8 @@ namespace {
 
 class ContestantNavigationContext final : public pyrobo::NavigationContext {
    public:
-    ContestantNavigationContext(
-        const pyrobo::Map& planning_map, double robot_radius
-    )
-        : planning_map_(planning_map), robot_radius_(robot_radius) {
+    ContestantNavigationContext(pyrobo::Map planning_map, double robot_radius)
+        : planning_map_(std::move(planning_map)), robot_radius_(robot_radius) {
     }
 
     const pyrobo::Map& planning_map() const noexcept {
@@ -46,6 +45,7 @@ std::unique_ptr<NavigationContext> nav_init(Simulator& sim) {
     // Question 2: do robot-radius preprocessing once during initialization.
     // This is where map inflation, clearance data or a collision model belongs.
     Map map = sim.map();
+    sim.set_planning_map(map);
 
     return std::make_unique<ContestantNavigationContext>(map, robot_radius);
 }

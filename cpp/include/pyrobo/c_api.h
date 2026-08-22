@@ -53,6 +53,10 @@ using pyrobo_callbacks = struct pyrobo_callbacks {
     int (*set_display_path)(
         void* user_data, const pyrobo_point* points, size_t count
     );
+    int (*set_planning_map)(
+        void* user_data, int height, int width, double resolution,
+        double origin_x, double origin_y, const uint8_t* data, size_t data_size
+    );
 };
 
 PYROBO_API void* pyrobo_create_navigation(

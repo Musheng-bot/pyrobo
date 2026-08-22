@@ -197,6 +197,26 @@ public:
         );
     }
 
+    void set_planning_map(const pyrobo::Map& map) override {
+        require(callbacks_.set_planning_map, "set_planning_map");
+        const auto shape = map.shape();
+        const auto origin = map.origin();
+        const auto& data = map.data();
+        check(
+            callbacks_.set_planning_map(
+                callbacks_.user_data,
+                shape.height,
+                shape.width,
+                map.resolution(),
+                origin.x,
+                origin.y,
+                data.data(),
+                data.size()
+            ),
+            "set_planning_map"
+        );
+    }
+
 private:
     template <typename Callback>
     static void require(Callback callback, const char* name) {

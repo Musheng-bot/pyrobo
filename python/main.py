@@ -116,6 +116,7 @@ def main() -> None:
         control_config=control_config,
         render=True,
         show_lidar=bool(display_config.get("show_lidar", True)),
+        show_planning_map=bool(display_config.get("show_planning_map", False)),
     )
     sim.robot.reset(initial_pose)
     sim.set_goal(goal)

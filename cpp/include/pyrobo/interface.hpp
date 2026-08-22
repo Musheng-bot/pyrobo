@@ -156,6 +156,7 @@ class Simulator {
     ) const = 0;
 
     virtual void set_display_path(const Path& path) = 0;
+    virtual void set_planning_map(const Map& map) = 0;
 };
 
 class NavigationContext {

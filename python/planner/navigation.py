@@ -20,6 +20,7 @@ def nav_init(sim: Simulator) -> NavigationContext:
     if sim.map is None:
         raise ValueError("navigation requires a map")
     planning_map = sim.map
+    sim.set_planning_map(planning_map)
     return NavigationContext(
         planning_map=planning_map,
         planner=PathPlanner(planning_map, sim),
@@ -34,6 +35,7 @@ def nav_run(sim: Simulator, context: NavigationContext) -> None:
         sim.set_display_path([])
         sim.set_control(0.0, 0.0)
         return
+    sim.set_planning_map(context.planning_map)
     context.planner.set_goal(goal)
     path = context.planner.plan()
     sim.set_display_path(path)

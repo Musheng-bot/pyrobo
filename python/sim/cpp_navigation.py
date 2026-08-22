@@ -8,6 +8,9 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
+import numpy as np
+
+from sim.map import Map
 from sim.simulator import Simulator
 
 
@@ -101,6 +104,19 @@ _SetDisplayPath = ctypes.CFUNCTYPE(
 )
 
 
+_SetPlanningMap = ctypes.CFUNCTYPE(
+    ctypes.c_int,
+    ctypes.c_void_p,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_double,
+    ctypes.c_double,
+    ctypes.c_double,
+    ctypes.POINTER(ctypes.c_uint8),
+    ctypes.c_size_t,
+)
+
+
 class _CCallbacks(ctypes.Structure):
     _fields_ = [
         ("user_data", ctypes.c_void_p),
@@ -116,6 +132,7 @@ class _CCallbacks(ctypes.Structure):
         ("get_control", _GetControl),
         ("get_lidar", _GetLidar),
         ("set_display_path", _SetDisplayPath),
+        ("set_planning_map", _SetPlanningMap),
     ]
 
 
@@ -306,6 +323,27 @@ class CppNavigation:
             )
             return 1
 
+        def set_planning_map(
+            _user: object,
+            height: int,
+            width: int,
+            resolution: float,
+            origin_x: float,
+            origin_y: float,
+            data: ctypes.POINTER(ctypes.c_uint8),
+            data_size: int,
+        ) -> int:
+            if height <= 0 or width <= 0 or data_size != height * width:
+                return 0
+            values = np.ctypeslib.as_array(data, shape=(data_size,)).copy()
+            planning_map = Map(
+                values.reshape((height, width)),
+                resolution=resolution,
+                origin=(origin_x, origin_y),
+            )
+            self._sim.set_planning_map(planning_map)
+            return 1
+
         functions = [
             (_GetMap, get_map, 0),
             (_GetPose, get_pose, 0),
@@ -319,6 +357,7 @@ class CppNavigation:
             (_GetControl, get_control, 0),
             (_GetLidar, get_lidar, 0),
             (_SetDisplayPath, set_display_path, 0),
+            (_SetPlanningMap, set_planning_map, 0),
         ]
         callbacks = [
             callback_type(self._safe(function, default))
