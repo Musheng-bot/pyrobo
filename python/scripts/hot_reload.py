@@ -28,7 +28,9 @@ def snapshot() -> tuple[tuple[str, int, int], ...]:
     return tuple(result)
 
 
-def run_build(python: str, config: str, build_dir: Path, parallel: int) -> bool:
+def run_build(
+    python: str, config: str, build_dir: Path, parallel: int, scenario: str
+) -> bool:
     command = [
         python,
         str(BUILD_SCRIPT),
@@ -39,6 +41,8 @@ def run_build(python: str, config: str, build_dir: Path, parallel: int) -> bool:
         "--parallel",
         str(parallel),
         "--skip-submission-check",
+        "--scenario",
+        scenario,
     ]
     print(f"+ {' '.join(command)}", flush=True)
     return subprocess.run(command, cwd=ROOT_DIR).returncode == 0
@@ -55,7 +59,9 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
         process.wait()
 
 
-def start_process(python: str, config: str, python_navigation: bool) -> subprocess.Popen[bytes]:
+def start_process(
+    python: str, config: str, python_navigation: bool, scenario: str
+) -> subprocess.Popen[bytes]:
     command = [
         python,
         str(RUN_SCRIPT),
@@ -63,6 +69,8 @@ def start_process(python: str, config: str, python_navigation: bool) -> subproce
         "--skip-submission-check",
         "--config",
         config,
+        "--scenario",
+        scenario,
     ]
     if python_navigation:
         command.append("--python-navigation")
@@ -102,6 +110,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run the reference Python navigation while testing the watcher.",
     )
+    parser.add_argument(
+        "--scenario",
+        choices=("ex", "unknown"),
+        default="ex",
+        help="Scenario configuration module under python/.",
+    )
     return parser.parse_args()
 
 
@@ -113,11 +127,13 @@ def main() -> int:
     if args.parallel <= 0:
         raise SystemExit("--parallel must be positive")
     if not args.skip_build and not run_build(
-        sys.executable, args.config, args.build_dir, args.parallel
+        sys.executable, args.config, args.build_dir, args.parallel, args.scenario
     ):
         raise SystemExit("initial C++ build failed")
 
-    process = start_process(sys.executable, args.config, args.python_navigation)
+    process = start_process(
+        sys.executable, args.config, args.python_navigation, args.scenario
+    )
     last_snapshot = snapshot()
     try:
         while True:
@@ -131,8 +147,16 @@ def main() -> int:
             last_snapshot = current_snapshot
             print("contestant.cpp changed; rebuilding and restarting...", flush=True)
             stop_process(process)
-            if run_build(sys.executable, args.config, args.build_dir, args.parallel):
-                process = start_process(sys.executable, args.config, args.python_navigation)
+            if run_build(
+                sys.executable,
+                args.config,
+                args.build_dir,
+                args.parallel,
+                args.scenario,
+            ):
+                process = start_process(
+                    sys.executable, args.config, args.python_navigation, args.scenario
+                )
             else:
                 print("build failed; waiting for the next source change", flush=True)
     except KeyboardInterrupt:

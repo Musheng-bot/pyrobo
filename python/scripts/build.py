@@ -20,7 +20,10 @@ HOT_RELOAD_SCRIPT = ROOT_DIR / "python" / "scripts" / "hot_reload.py"
 
 def run_command(command: list[str], cwd: Path) -> None:
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=cwd, check=True)
+    try:
+        subprocess.run(command, cwd=cwd, check=True)
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(error.returncode) from None
 
 
 def require_command(name: str) -> str:
@@ -85,6 +88,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="After building, start the simulator and rebuild when contestant.cpp changes.",
     )
+    parser.add_argument(
+        "--scenario",
+        choices=("ex", "unknown"),
+        default="ex",
+        help="Scenario configuration module under python/.",
+    )
     return parser.parse_args()
 
 
@@ -142,6 +151,8 @@ def main() -> int:
             str(build_dir),
             "--parallel",
             str(args.parallel),
+            "--scenario",
+            args.scenario,
         ]
         run_command(watch_command, ROOT_DIR)
     return 0

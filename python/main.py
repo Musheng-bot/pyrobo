@@ -1,6 +1,7 @@
+import argparse
+import importlib
 from pathlib import Path
 from typing import Any
-import argparse
 
 import yaml
 
@@ -20,6 +21,18 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
         config = yaml.safe_load(file) or {}
     if not isinstance(config, dict):
         raise ValueError(f"configuration root must be a mapping: {path}")
+    return config
+
+
+def load_scenario(name: str) -> dict[str, Any]:
+    try:
+        module = importlib.import_module(name)
+    except ModuleNotFoundError as error:
+        raise ValueError(f"unknown scenario: {name!r}") from error
+
+    config = getattr(module, "CONFIG", None)
+    if not isinstance(config, dict):
+        raise ValueError(f"scenario {name!r} must define a CONFIG mapping")
     return config
 
 
@@ -86,8 +99,15 @@ def main() -> None:
         action="store_true",
         help="Use the reference Python navigation instead of the compiled C++ answer.",
     )
+    parser.add_argument(
+        "--scenario",
+        choices=("ex", "unknown"),
+        default="ex",
+        help="Scenario configuration module under python/.",
+    )
     args = parser.parse_args()
-    config = load_config()
+    config = load_scenario(args.scenario)
+    display_file_config = load_config()
     pyrobo = config.get("pyrobo")
     if not isinstance(pyrobo, dict):
         raise ValueError("config must define a pyrobo mapping")
@@ -97,7 +117,12 @@ def main() -> None:
     control_config = pyrobo.get("control")
     if not isinstance(control_config, dict):
         raise ValueError("config must define pyrobo.control")
-    display_config = pyrobo.get("display", {})
+    display_root = display_file_config.get("pyrobo", {})
+    display_config = (
+        display_root.get("display", {})
+        if isinstance(display_root, dict)
+        else {}
+    )
     if not isinstance(display_config, dict):
         raise ValueError("pyrobo.display must be a mapping")
     map_config = pyrobo.get("map")

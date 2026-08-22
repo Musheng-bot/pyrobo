@@ -17,7 +17,10 @@ MAIN_SCRIPT = ROOT_DIR / "python" / "main.py"
 
 def run_command(command: list[str], cwd: Path) -> None:
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=cwd, check=True)
+    try:
+        subprocess.run(command, cwd=cwd, check=True)
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(error.returncode) from None
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,6 +36,12 @@ def parse_args() -> argparse.Namespace:
         "--python-navigation",
         action="store_true",
         help="Use the reference Python navigation instead of the compiled C++ answer.",
+    )
+    parser.add_argument(
+        "--scenario",
+        choices=("ex", "unknown"),
+        default="ex",
+        help="Scenario configuration module under python/.",
     )
     parser.add_argument(
         "--config",
@@ -87,6 +96,7 @@ def main() -> int:
     main_command = [args.python, str(MAIN_SCRIPT)]
     if args.python_navigation:
         main_command.append("--python-navigation")
+    main_command.extend(["--scenario", args.scenario])
     run_command(main_command, ROOT_DIR)
     return 0
 

@@ -65,6 +65,8 @@ def main() -> int:
     illegal = sorted(path for path in changed_files(args.base) if is_protected(path))
 
     if illegal:
+        print("Reminder: uncommitted or modified files were found under python/.")
+        print("Contestants may only modify C++ code under cpp/. Restore these files before running.")
         print("Submission check failed: the Python directory must not be modified:")
         print(f"  - {PROTECTED_DIRECTORY}")
         print("\nIllegal modified files:")
