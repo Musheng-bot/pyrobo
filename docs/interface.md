@@ -257,3 +257,284 @@ def nav_run(sim: Simulator, context) -> None:
     a, b = controller.follow(path, pose, feedback)
     sim.set_control(a, b)
 ```
+
+## 六、C++ 对应接口
+
+项目提供的 C++ 核心接口定义在 `cpp/include/pyrobo/interface.hpp`。C++ 接口与上文 Python 接口保持一一对应；答题人可以在 `cpp/src/contestant.cpp` 中实现导航逻辑。
+
+### 基本类型
+
+```cpp
+#include "pyrobo/interface.hpp"
+
+pyrobo::Pose pose{x, y, yaw};      // 对应 Python 的 (x, y, yaw)
+pyrobo::Point point{x, y};         // 对应 Python 的 (x, y)
+pyrobo::Path path{{x1, y1}, {x2, y2}};
+pyrobo::Control control{a, b};
+```
+
+地图数据使用行优先一维数组保存，元素非零表示可通行，零表示障碍物：
+
+```cpp
+const std::vector<std::uint8_t>& data = world_map.data();
+bool free = data[row * world_map.shape().width + column] != 0;
+```
+
+### 地图查询
+
+Python：
+
+```python
+world_map = sim.map
+```
+
+C++：
+
+```cpp
+const pyrobo::Map& world_map = sim.map();
+```
+
+地图数据字段对应关系：
+
+```python
+world_map.data
+world_map.shape
+world_map.resolution
+world_map.origin
+```
+
+```cpp
+const auto& data = world_map.data();
+pyrobo::Shape shape = world_map.shape();  // shape.height, shape.width
+double resolution = world_map.resolution();
+pyrobo::Point origin = world_map.origin(); // origin.x, origin.y
+```
+
+世界坐标和栅格坐标转换：
+
+```python
+column, row = world_map.world_to_grid(x, y)
+x, y = world_map.grid_to_world(column, row)
+```
+
+```cpp
+pyrobo::GridIndex index = world_map.world_to_grid(x, y);
+int column = index.column;
+int row = index.row;
+
+pyrobo::Point center = world_map.grid_to_world(column, row);
+double center_x = center.x;
+double center_y = center.y;
+```
+
+查询可通行区域和地图实际尺寸：
+
+```python
+free = world_map.is_free(x, y)
+width_m, height_m = world_map.size_meters
+```
+
+```cpp
+bool free = world_map.is_free(x, y);
+pyrobo::Point size_meters = world_map.size_meters();
+double width_m = size_meters.x;
+double height_m = size_meters.y;
+```
+
+### 导航回调结构
+
+Python：
+
+```python
+context = nav_init(sim)
+sim.run(callback=lambda sim: nav_run(sim, context))
+```
+
+C++：
+
+```cpp
+std::unique_ptr<pyrobo::NavigationContext> context = pyrobo::nav_init(sim);
+pyrobo::nav_run(sim, *context);
+```
+
+候选人通常只需要修改 `cpp/src/contestant.cpp` 中的：
+
+```cpp
+std::unique_ptr<pyrobo::NavigationContext> nav_init(pyrobo::Simulator& sim);
+void nav_run(pyrobo::Simulator& sim, pyrobo::NavigationContext& context);
+```
+
+### 获取机器人位姿和半径
+
+Python：
+
+```python
+x, y, yaw = sim.get_pose()
+x, y, yaw = sim.get_pose(robot_id="robot_2")
+robot = sim.get_robot()
+radius = robot.radius
+```
+
+C++：
+
+```cpp
+pyrobo::Pose pose = sim.get_pose();
+pyrobo::Pose pose_2 = sim.get_pose("robot_2");
+
+pyrobo::RobotInfo robot = sim.get_robot();
+double radius = robot.radius;
+```
+
+### 获取、设置和清除目标点
+
+Python：
+
+```python
+goal = sim.get_goal()
+sim.set_goal((x, y))
+sim.set_goal((x, y, yaw))
+sim.clear_goal()
+```
+
+C++：
+
+```cpp
+std::optional<pyrobo::Pose> goal = sim.get_goal();
+if (!goal.has_value()) {
+    sim.set_control(0.0, 0.0);
+    return;
+}
+
+sim.set_goal(pyrobo::Point{x, y});
+sim.set_goal(pyrobo::Pose{x, y, yaw});
+sim.clear_goal();
+```
+
+### 获取反馈速度
+
+Python：
+
+```python
+first, second = sim.get_feedback()
+first, second = sim.get_feedback(robot_id="robot_2")
+vx, vy, omega = sim.get_vector_feedback()
+```
+
+C++：
+
+```cpp
+pyrobo::Feedback feedback = sim.get_feedback();
+double first = feedback.first;
+double second = feedback.second;
+
+pyrobo::Feedback feedback_2 = sim.get_feedback("robot_2");
+
+pyrobo::VectorFeedback vector_feedback = sim.get_vector_feedback();
+double vx = std::get<0>(vector_feedback);
+double vy = std::get<1>(vector_feedback);
+double omega = std::get<2>(vector_feedback);
+```
+
+### 设置和读取控制量
+
+Python：
+
+```python
+sim.set_control(a, b)
+sim.set_control(0.2, 0.0, robot_id="robot_2")
+a, b = sim.get_control()
+```
+
+C++：
+
+```cpp
+sim.set_control(a, b);
+sim.set_control(0.2, 0.0, "robot_2");
+
+pyrobo::Control control = sim.get_control();
+double a = control.first;
+double b = control.second;
+```
+
+控制量限制仍由仿真器根据配置文件自动处理；C++ 答题代码只负责输出期望控制量。
+
+### 二维雷达
+
+Python：
+
+```python
+ranges = sim.get_lidar(count=360, max_range=3.0, fov=2 * math.pi)
+front_distance = ranges[len(ranges) // 2]
+ranges = sim.get_lidar(robot_id="robot_2")
+```
+
+C++：
+
+```cpp
+constexpr double pi = 3.14159265358979323846;
+std::vector<double> ranges = sim.get_lidar("robot", 360, 3.0, 2.0 * pi);
+double front_distance = ranges[ranges.size() / 2];
+
+std::vector<double> ranges_2 = sim.get_lidar("robot_2");
+```
+
+第 `i` 项对应机器人坐标系中的相对角度仍为：
+
+```cpp
+double angle = -fov / 2.0 + static_cast<double>(i) * fov / count;
+```
+
+### 显示规划路径
+
+Python：
+
+```python
+sim.set_display_path(path)
+sim.set_display_path([])
+```
+
+C++：
+
+```cpp
+pyrobo::Path path{{x1, y1}, {x2, y2}};
+sim.set_display_path(path);
+sim.set_display_path({});
+```
+
+路径点必须使用世界坐标，单位为米。
+
+## 七、构建和运行
+
+项目提供跨平台脚本，Windows/Linux/macOS 均可使用。构建脚本会用 CMake 编译 `cpp/src/contestant.cpp`，运行脚本默认先构建 C++ 模板，再启动 Python 仿真器。
+
+Windows：
+
+```bat
+build.bat
+run.bat
+```
+
+Linux/macOS：
+
+```sh
+sh build.sh
+sh run.sh
+```
+
+也可以直接使用 Python 脚本：
+
+```sh
+python scripts/build.py
+python scripts/run.py
+```
+
+常用参数：
+
+```sh
+python scripts/build.py --clean
+python scripts/build.py --config Debug
+python scripts/run.py --skip-build
+python scripts/run.py --clean
+```
+
+运行前需要本机已安装 Python、CMake 和支持 C++17 的编译器。Python 仿真器还需要项目原有依赖，例如 `pygame`、`PyYAML`、`numpy` 和 `Pillow`。

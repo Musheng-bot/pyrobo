@@ -10,7 +10,7 @@ pyrobo:
     resolution: 0.05 # meter / pixel
     name: "map" # `map/*.pgm` or `map/*.png`
   control:
-    mode: manual # `manual` or `auto`
+    mode: auto # `manual` or `auto`
     command_type: vx_vy # candidate may implement another model in sim
     vx_vy:
       vx_max: 1.5
