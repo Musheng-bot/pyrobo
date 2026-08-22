@@ -6,10 +6,10 @@ where py >nul 2>nul
 if not errorlevel 1 (
     py -3 -c "import sys" >nul 2>nul
     if not errorlevel 1 (
-        py -3 "%ROOT_DIR%scripts\run.py" %*
+        py -3 "%ROOT_DIR%python\scripts\run.py" %*
         exit /b %errorlevel%
     )
 )
 
-python "%ROOT_DIR%scripts\run.py" %*
+python "%ROOT_DIR%python\scripts\run.py" %*
 exit /b %errorlevel%

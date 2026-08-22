@@ -11,7 +11,7 @@ from typing import Callable
 from sim.simulator import Simulator
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_BUILD_DIR = ROOT_DIR / "cpp" / "build"
 
 

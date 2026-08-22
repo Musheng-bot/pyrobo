@@ -9,4 +9,5 @@
 *.sh text working-tree-encoding=UTF-8 eol=lf
 CMakeLists.txt text working-tree-encoding=UTF-8 eol=lf
 .editorconfig text working-tree-encoding=UTF-8 eol=lf
+.clangd text working-tree-encoding=UTF-8 eol=lf
 .gitignore text working-tree-encoding=UTF-8 eol=lf

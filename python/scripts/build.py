@@ -11,11 +11,11 @@ import sys
 from pathlib import Path
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 CPP_DIR = ROOT_DIR / "cpp"
 DEFAULT_BUILD_DIR = CPP_DIR / "build"
-CHECK_SCRIPT = ROOT_DIR / "scripts" / "check_submission.py"
-HOT_RELOAD_SCRIPT = ROOT_DIR / "scripts" / "hot_reload.py"
+CHECK_SCRIPT = ROOT_DIR / "python" / "scripts" / "check_submission.py"
+HOT_RELOAD_SCRIPT = ROOT_DIR / "python" / "scripts" / "hot_reload.py"
 
 
 def run_command(command: list[str], cwd: Path) -> None:
@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-submission-check",
         action="store_true",
-        help="Do not reject changes outside cpp/src/contestant.cpp before building.",
+        help="Do not reject changes inside python/ before building.",
     )
     parser.add_argument(
         "--base",

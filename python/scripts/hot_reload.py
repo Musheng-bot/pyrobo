@@ -10,9 +10,9 @@ import time
 from pathlib import Path
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-BUILD_SCRIPT = ROOT_DIR / "scripts" / "build.py"
-RUN_SCRIPT = ROOT_DIR / "scripts" / "run.py"
+ROOT_DIR = Path(__file__).resolve().parents[2]
+BUILD_SCRIPT = ROOT_DIR / "python" / "scripts" / "build.py"
+RUN_SCRIPT = ROOT_DIR / "python" / "scripts" / "run.py"
 WATCH_FILES = (ROOT_DIR / "cpp" / "src" / "contestant.cpp",)
 
 

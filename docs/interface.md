@@ -1,6 +1,6 @@
 # PyRobo 接口说明
 
-除运动学模型题目外，题目代码只需要在 `planner` 包中完成。地图、机器人运动、碰撞检测和 pygame 界面由 `sim` 包提供；运动学模型题目允许修改 `sim` 包。
+答题代码只需要在 `cpp/src/contestant.cpp` 中完成。地图、机器人运动、碰撞检测和 pygame 界面由 `python/` 目录提供；答题人不需要修改 Python 实现。
 
 ## 基本约定
 
@@ -516,7 +516,6 @@ Windows：
 ```bat
 build.bat
 run.bat
-hot_reload.bat
 ```
 
 Linux/macOS：
@@ -524,64 +523,63 @@ Linux/macOS：
 ```sh
 sh build.sh
 sh run.sh
-sh hot_reload.sh
 ```
 
 也可以直接使用 Python 脚本：
 
 ```sh
-python scripts/build.py
-python scripts/run.py
+python python/scripts/build.py
+python python/scripts/run.py
 ```
 
 常用参数：
 
 ```sh
-python scripts/build.py --clean
-python scripts/build.py --config Debug
-python scripts/run.py --skip-build
-python scripts/run.py --clean
-python scripts/run.py --python-navigation
+python python/scripts/build.py --clean
+python python/scripts/build.py --config Debug
+python python/scripts/run.py --skip-build
+python python/scripts/run.py --clean
+python python/scripts/run.py --python-navigation
 ```
 
-`hot_reload` 会监测 `cpp/src/contestant.cpp`。保存文件后，它会自动停止当前仿真、重新编译
-并启动仿真；编译失败时保留错误信息并等待下一次修改。
-
 `build.bat` 和 `build.sh` 默认已经包含上述热重载行为：首次构建成功后会直接启动仿真。
+它们会监测 `cpp/src/contestant.cpp`。保存文件后，会自动停止当前仿真、重新编译并启动仿真；
+编译失败时保留错误信息并等待下一次修改。
 如果只想编译而不启动仿真，请直接调用：
 
 ```sh
-python scripts/build.py
+python python/scripts/build.py
 ```
 
 也可以用 Python 脚本显式开启“构建并热重载”：
 
 ```sh
-python scripts/build.py --watch
+python python/scripts/build.py --watch
 ```
 
 `--python-navigation` 仅用于出题人调试参考实现，不是答题运行方式。
 
-默认情况下，`build.py` 和 `run.py` 会先检查答题者是否修改了允许的答题文件。允许修改的文件是：
+默认情况下，`build.py` 和 `run.py` 会先检查答题者是否修改了受保护的 Python 目录。
+答题人可以修改 C++ 答题代码，`python/` 目录则必须保持不变：
 
 ```text
-cpp/src/contestant.cpp
+python/
 ```
 
-如果修改了 Python、配置、文档、C++ 公共接口、构建文件或新增其他文件，脚本会直接失败。
+如果修改了 `python/` 下任意文件，脚本会直接失败；配置、文档、C++ 和构建文件不由此检查器拦截。
 出题人本地调试脚本时可以临时跳过检查：
 
 ```sh
-python scripts/build.py --skip-submission-check
-python scripts/run.py --skip-submission-check
+python python/scripts/build.py --skip-submission-check
+python python/scripts/run.py --skip-submission-check
 ```
 
 评测时应传入起始版本的 tag 或 commit，这样即使答题者把 Python 改动提交进 git，也会被检查出来：
 
 ```sh
-python scripts/check_submission.py --base starter
-python scripts/build.py --base starter
-python scripts/run.py --base starter
+python python/scripts/check_submission.py --base starter
+python python/scripts/build.py --base starter
+python python/scripts/run.py --base starter
 ```
 
 运行前需要本机已安装 Python、CMake 和支持 C++17 的编译器。Python 仿真器还需要项目原有依赖，例如 `pygame`、`PyYAML`、`numpy` 和 `Pillow`。

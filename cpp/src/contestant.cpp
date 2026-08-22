@@ -1,20 +1,21 @@
-#include "pyrobo/interface.hpp"
-
 #include <memory>
 #include <stdexcept>
+
+#include "pyrobo/interface.hpp"
 
 namespace {
 
 class ContestantNavigationContext final : public pyrobo::NavigationContext {
-public:
+   public:
     explicit ContestantNavigationContext(const pyrobo::Map& planning_map)
-        : planning_map_(planning_map) {}
+        : planning_map_(planning_map) {
+    }
 
     const pyrobo::Map& planning_map() const noexcept {
         return planning_map_;
     }
 
-private:
+   private:
     const pyrobo::Map& planning_map_;
 };
 
@@ -27,7 +28,8 @@ std::unique_ptr<NavigationContext> nav_init(Simulator& sim) {
 }
 
 void nav_run(Simulator& sim, NavigationContext& context) {
-    auto* navigation_context = dynamic_cast<ContestantNavigationContext*>(&context);
+    auto* navigation_context =
+        dynamic_cast<ContestantNavigationContext*>(&context);
     if (navigation_context == nullptr) {
         throw std::runtime_error("invalid navigation context");
     }
@@ -35,7 +37,7 @@ void nav_run(Simulator& sim, NavigationContext& context) {
     const auto goal = sim.get_goal();
     if (!goal.has_value()) {
         sim.set_display_path({});
-        sim.set_control(0.0, 0.0);
+        sim.set_control(1.0, 1.0);
         return;
     }
 

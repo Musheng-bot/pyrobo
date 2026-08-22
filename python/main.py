@@ -9,7 +9,7 @@ from sim.simulator import Simulator
 from sim.cpp_navigation import CppNavigation
 
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[1]
 CONFIG_FILE = ROOT_DIR / "config" / "sim.yaml"
 MAP_DIR = ROOT_DIR / "map"
 SUPPORTED_MAP_SUFFIXES = (".pgm", ".png")
