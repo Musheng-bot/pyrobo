@@ -3,6 +3,7 @@
 *.yaml text working-tree-encoding=UTF-8 eol=lf
 *.yml text working-tree-encoding=UTF-8 eol=lf
 *.cpp text working-tree-encoding=UTF-8 eol=lf
+*.h text working-tree-encoding=UTF-8 eol=lf
 *.hpp text working-tree-encoding=UTF-8 eol=lf
 *.bat text working-tree-encoding=UTF-8 eol=crlf
 *.sh text working-tree-encoding=UTF-8 eol=lf

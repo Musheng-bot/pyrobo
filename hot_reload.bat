@@ -6,10 +6,10 @@ where py >nul 2>nul
 if not errorlevel 1 (
     py -3 -c "import sys" >nul 2>nul
     if not errorlevel 1 (
-        py -3 "%ROOT_DIR%scripts\build.py" --watch %*
+        py -3 "%ROOT_DIR%scripts\hot_reload.py" %*
         exit /b %errorlevel%
     )
 )
 
-python "%ROOT_DIR%scripts\build.py" --watch %*
+python "%ROOT_DIR%scripts\hot_reload.py" %*
 exit /b %errorlevel%

@@ -14,6 +14,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CPP_DIR = ROOT_DIR / "cpp"
 DEFAULT_BUILD_DIR = CPP_DIR / "build"
+CHECK_SCRIPT = ROOT_DIR / "scripts" / "check_submission.py"
+HOT_RELOAD_SCRIPT = ROOT_DIR / "scripts" / "hot_reload.py"
 
 
 def run_command(command: list[str], cwd: Path) -> None:
@@ -66,12 +68,35 @@ def parse_args() -> argparse.Namespace:
         default=os.cpu_count() or 1,
         help="Number of parallel build jobs.",
     )
+    parser.add_argument(
+        "--skip-submission-check",
+        action="store_true",
+        help="Do not reject changes outside cpp/src/contestant.cpp before building.",
+    )
+    parser.add_argument(
+        "--base",
+        help=(
+            "Starter commit/tag/ref for the submission check. "
+            "Also catches committed non-C++ changes."
+        ),
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="After building, start the simulator and rebuild when contestant.cpp changes.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     cmake = require_command("cmake")
+
+    if not args.skip_submission_check:
+        check_command = [sys.executable, str(CHECK_SCRIPT)]
+        if args.base:
+            check_command.extend(["--base", args.base])
+        run_command(check_command, ROOT_DIR)
 
     build_dir = args.build_dir
     if not build_dir.is_absolute():
@@ -105,6 +130,20 @@ def main() -> int:
 
     run_command(configure_command, ROOT_DIR)
     run_command(build_command, ROOT_DIR)
+
+    if args.watch:
+        watch_command = [
+            sys.executable,
+            str(HOT_RELOAD_SCRIPT),
+            "--skip-build",
+            "--config",
+            args.config,
+            "--build-dir",
+            str(build_dir),
+            "--parallel",
+            str(args.parallel),
+        ]
+        run_command(watch_command, ROOT_DIR)
     return 0
 
 

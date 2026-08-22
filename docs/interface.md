@@ -505,13 +505,18 @@ sim.set_display_path({});
 
 ## 七、构建和运行
 
-项目提供跨平台脚本，Windows/Linux/macOS 均可使用。构建脚本会用 CMake 编译 `cpp/src/contestant.cpp`，运行脚本默认先构建 C++ 模板，再启动 Python 仿真器。
+项目提供跨平台脚本，Windows/Linux/macOS 均可使用。CMake 会把
+`cpp/src/contestant.cpp` 和桥接代码编译成动态库。运行时 Python 只负责地图、窗口和
+物理仿真，导航逻辑由动态库中的 C++ 代码执行，因此修改 C++ 后运行结果会真正发生变化。
+
+默认使用 C++ 导航：
 
 Windows：
 
 ```bat
 build.bat
 run.bat
+hot_reload.bat
 ```
 
 Linux/macOS：
@@ -519,6 +524,7 @@ Linux/macOS：
 ```sh
 sh build.sh
 sh run.sh
+sh hot_reload.sh
 ```
 
 也可以直接使用 Python 脚本：
@@ -535,6 +541,47 @@ python scripts/build.py --clean
 python scripts/build.py --config Debug
 python scripts/run.py --skip-build
 python scripts/run.py --clean
+python scripts/run.py --python-navigation
+```
+
+`hot_reload` 会监测 `cpp/src/contestant.cpp`。保存文件后，它会自动停止当前仿真、重新编译
+并启动仿真；编译失败时保留错误信息并等待下一次修改。
+
+`build.bat` 和 `build.sh` 默认已经包含上述热重载行为：首次构建成功后会直接启动仿真。
+如果只想编译而不启动仿真，请直接调用：
+
+```sh
+python scripts/build.py
+```
+
+也可以用 Python 脚本显式开启“构建并热重载”：
+
+```sh
+python scripts/build.py --watch
+```
+
+`--python-navigation` 仅用于出题人调试参考实现，不是答题运行方式。
+
+默认情况下，`build.py` 和 `run.py` 会先检查答题者是否修改了允许的答题文件。允许修改的文件是：
+
+```text
+cpp/src/contestant.cpp
+```
+
+如果修改了 Python、配置、文档、C++ 公共接口、构建文件或新增其他文件，脚本会直接失败。
+出题人本地调试脚本时可以临时跳过检查：
+
+```sh
+python scripts/build.py --skip-submission-check
+python scripts/run.py --skip-submission-check
+```
+
+评测时应传入起始版本的 tag 或 commit，这样即使答题者把 Python 改动提交进 git，也会被检查出来：
+
+```sh
+python scripts/check_submission.py --base starter
+python scripts/build.py --base starter
+python scripts/run.py --base starter
 ```
 
 运行前需要本机已安装 Python、CMake 和支持 C++17 的编译器。Python 仿真器还需要项目原有依赖，例如 `pygame`、`PyYAML`、`numpy` 和 `Pillow`。

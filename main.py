@@ -1,10 +1,12 @@
 from pathlib import Path
 from typing import Any
+import argparse
 
 import yaml
 
 from planner.navigation import nav_init, nav_run
 from sim.simulator import Simulator
+from sim.cpp_navigation import CppNavigation
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -78,6 +80,13 @@ def get_robot_config(config: dict[str, Any]) -> tuple[tuple[float, float, float]
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the PyRobo simulator.")
+    parser.add_argument(
+        "--python-navigation",
+        action="store_true",
+        help="Use the reference Python navigation instead of the compiled C++ answer.",
+    )
+    args = parser.parse_args()
     config = load_config()
     pyrobo = config.get("pyrobo")
     if not isinstance(pyrobo, dict):
@@ -121,15 +130,23 @@ def main() -> None:
         _ = feedback_vx, feedback_vy
 
     if mode == "auto":
-        navigation_context = nav_init(sim)
+        cpp_navigation = None if args.python_navigation else CppNavigation(sim)
+        navigation_context = nav_init(sim) if args.python_navigation else None
 
         def auto_control(environment: Simulator) -> None:
-            nav_run(environment, navigation_context)
+            if cpp_navigation is not None:
+                cpp_navigation.run()
+            else:
+                nav_run(environment, navigation_context)
 
         callback = auto_control
     else:
         callback = manual_control
-    sim.run(callback=callback)
+    try:
+        sim.run(callback=callback)
+    finally:
+        if mode == "auto" and cpp_navigation is not None:
+            cpp_navigation.close()
 
 
 if __name__ == "__main__":

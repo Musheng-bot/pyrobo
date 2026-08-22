@@ -6,7 +6,7 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.{py,cpp,hpp,md,yaml,yml}]
+[*.{py,cpp,h,hpp,md,yaml,yml}]
 indent_style = space
 indent_size = 4
 

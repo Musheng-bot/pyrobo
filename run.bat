@@ -3,8 +3,13 @@ setlocal
 
 set "ROOT_DIR=%~dp0"
 where py >nul 2>nul
-if %errorlevel%==0 (
-    py -3 "%ROOT_DIR%scripts\run.py" %*
-) else (
-    python "%ROOT_DIR%scripts\run.py" %*
+if not errorlevel 1 (
+    py -3 -c "import sys" >nul 2>nul
+    if not errorlevel 1 (
+        py -3 "%ROOT_DIR%scripts\run.py" %*
+        exit /b %errorlevel%
+    )
 )
+
+python "%ROOT_DIR%scripts\run.py" %*
+exit /b %errorlevel%
