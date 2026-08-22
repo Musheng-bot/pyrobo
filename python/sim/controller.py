@@ -87,9 +87,6 @@ class Controller:
         self._expected_second = 0.0
         self._feedback_first = 0.0
         self._feedback_second = 0.0
-        self._feedback_vx = 0.0
-        self._feedback_vy = 0.0
-        self._feedback_omega = 0.0
 
     def set_control(self, first: float, second: float) -> None:
         """设置下一次仿真周期使用的两个控制量。
@@ -136,9 +133,6 @@ class Controller:
             )
 
         self._feedback_first, self._feedback_second = command
-        self._feedback_vx, self._feedback_vy, self._feedback_omega = (
-            self.kinematics.feedback(command)
-        )
         self._previous_command = command
         self.robot._commit_pose(next_pose)
         return self.get_feedback()
@@ -146,10 +140,6 @@ class Controller:
     def get_feedback(self) -> tuple[float, float]:
         """获取最近一个仿真周期实际执行的两个控制量。"""
         return self._feedback_first, self._feedback_second
-
-    def get_vector_feedback(self) -> tuple[float, float, float]:
-        """获取最近周期的 ``(vx, vy, omega)`` 反馈。"""
-        return self._feedback_vx, self._feedback_vy, self._feedback_omega
 
     # Compatibility aliases for the original API.
     set_target = set_control

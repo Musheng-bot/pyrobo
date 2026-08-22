@@ -7,7 +7,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -40,7 +39,6 @@ struct RobotInfo {
 
 using Path = std::vector<Point>;
 using Feedback = std::pair<double, double>;
-using VectorFeedback = std::tuple<double, double, double>;
 using Control = std::pair<double, double>;
 
 class Map {
@@ -138,9 +136,6 @@ class Simulator {
 
     virtual Feedback get_feedback(std::string_view robot_id = "robot")
         const = 0;
-    virtual VectorFeedback get_vector_feedback(
-        std::string_view robot_id = "robot"
-    ) const = 0;
 
     virtual void set_control(
         double first, double second, std::string_view robot_id = "robot"

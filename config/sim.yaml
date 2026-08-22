@@ -1,3 +1,4 @@
+# 你需要知道的是，这里面除了展示部分`display`下的配置是真实被读取的以外，其他的数值都是硬编码的，修改配置不会对仿真产生影响，请你务必知晓这一点
 meta:
   author: Musheng-bot
   email: meisoren081@gmail.com

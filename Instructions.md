@@ -43,7 +43,7 @@ const pyrobo::Map& map = sim.map();
 
 ```cpp
 if (map.is_free(x, y)) {
-    // (x, y) 可以通行，(x, y)是栅格坐标
+    // (x, y) 是地图坐标，可以通行
 }
 ```
 
@@ -56,6 +56,7 @@ const auto shape = map.shape();
 for (int row = 0; row < shape.height; ++row) {
     for (int column = 0; column < shape.width; ++column) {
         if (map.is_free_cell(column, row)) {
+            // (column, row) 是栅格坐标
             const auto point = map.grid_to_world(column, row);
             // point.x 和 point.y 是这个格子中心的地图坐标
         }
@@ -63,8 +64,8 @@ for (int row = 0; row < shape.height; ++row) {
 }
 ```
 
-`map.world_to_grid(x, y)` 可以把地图坐标转换为格子坐标，
-`map.grid_to_world(column, row)` 可以把格子坐标转换回格子中心的地图坐标。
+`map.world_to_grid(x, y)` 的输入 `(x, y)` 是地图坐标，返回值是栅格坐标。
+`map.grid_to_world(column, row)` 的输入是栅格坐标，返回值是格子中心的地图坐标。
 
 ### 显示路径
 
@@ -72,6 +73,7 @@ for (int row = 0; row < shape.height; ++row) {
 
 ```cpp
 pyrobo::Path path{
+    // 每个点都是地图坐标
     {robot_pose.x, robot_pose.y},
     {goal_pose.x, goal_pose.y},
 };
@@ -90,6 +92,22 @@ sim.set_planning_map(map);
 
 它只影响显示，不影响真实碰撞检测和雷达数据。碰撞检测和雷达始终使用 `sim.map()`。
 
+### 机器人状态和控制
+
+```cpp
+const pyrobo::Pose pose = sim.get_pose();
+// pose.x 和 pose.y 是地图坐标，pose.yaw 是弧度
+
+const auto goal = sim.get_goal();
+// goal->x 和 goal->y 是地图坐标，goal->yaw 是弧度
+
+const auto feedback = sim.get_feedback();
+// feedback.first 和 feedback.second 是地图坐标系下实际执行的 vx、vy
+
+sim.set_control(vx, vy);
+// vx、vy 是地图坐标系下的速度，单位是 m/s
+```
+
 ## 规划器接口
 
 你只需要修改 `cpp/src/planner.cpp` 中的两个函数，仿真器会自动调用它们。
@@ -106,6 +124,7 @@ return {
 ```
 
 每个点按 `{x, y}` 写，路径至少包含起点和终点。
+`robot_pose` 和 `goal_pose` 中的 `x、y` 是地图坐标，`map` 中的 `column、row` 是栅格坐标。
 
 ### 速度控制
 
@@ -118,6 +137,7 @@ return {vx, vy};
 ```
 
 不需要计算车身坐标系，也不需要设置角速度。实际速度会受到配置文件中的动力学约束。
+`robot_pose` 和 `goal_pose` 中的 `x、y` 是地图坐标，`feedback` 是地图坐标系下的实际 `vx、vy`。
 
 ## 获取雷达数据接口
 
@@ -127,7 +147,7 @@ return {vx, vy};
 const std::vector<double> lidar = sim.get_lidar();
 ```
 
-默认返回 360 个距离值，单位是米，最大距离是 3 米。第 `i` 个数据对应的角度为：
+雷达调用不需要坐标输入。默认返回 360 个距离值，单位是米，最大距离是 3 米。第 `i` 个数据对应的角度为：
 
 ```text
 -pi + i * 2 * pi / 360

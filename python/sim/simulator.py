@@ -202,10 +202,6 @@ class Simulator:
         """获取最近一个仿真周期的两个实际控制量。"""
         return self.controllers[robot_id].get_feedback()
 
-    def get_vector_feedback(self, robot_id: str = "robot") -> tuple[float, float, float]:
-        """获取最近周期的 ``(vx, vy, omega)`` 反馈。"""
-        return self.controllers[robot_id].get_vector_feedback()
-
     def get_pose(self, robot_id: str = "robot") -> tuple[float, float, float]:
         """获取机器人当前世界位姿 ``(x, y, yaw)``。"""
         return self.robots[robot_id].pose

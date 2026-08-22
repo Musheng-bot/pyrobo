@@ -61,14 +61,6 @@ _GetFeedback = ctypes.CFUNCTYPE(
     ctypes.POINTER(ctypes.c_double),
     ctypes.POINTER(ctypes.c_double),
 )
-_GetVectorFeedback = ctypes.CFUNCTYPE(
-    ctypes.c_int,
-    ctypes.c_void_p,
-    ctypes.c_char_p,
-    ctypes.POINTER(ctypes.c_double),
-    ctypes.POINTER(ctypes.c_double),
-    ctypes.POINTER(ctypes.c_double),
-)
 _SetControl = ctypes.CFUNCTYPE(
     ctypes.c_int,
     ctypes.c_void_p,
@@ -117,7 +109,6 @@ class _CCallbacks(ctypes.Structure):
         ("get_robot", _GetRobot),
         ("get_goal", _GetGoal),
         ("get_feedback", _GetFeedback),
-        ("get_vector_feedback", _GetVectorFeedback),
         ("set_control", _SetControl),
         ("get_control", _GetControl),
         ("get_lidar", _GetLidar),
@@ -258,16 +249,6 @@ class CppNavigation:
             first[0], second[0] = self._sim.get_feedback(self._robot_id(robot_id))
             return 1
 
-        def get_vector_feedback(
-            _user: object,
-            robot_id: bytes,
-            vx: ctypes.POINTER(ctypes.c_double),
-            vy: ctypes.POINTER(ctypes.c_double),
-            omega: ctypes.POINTER(ctypes.c_double),
-        ) -> int:
-            vx[0], vy[0], omega[0] = self._sim.get_vector_feedback(self._robot_id(robot_id))
-            return 1
-
         def set_control(_user: object, robot_id: bytes, first: float, second: float) -> int:
             self._sim.set_control(first, second, self._robot_id(robot_id))
             return 1
@@ -332,7 +313,6 @@ class CppNavigation:
             (_GetRobot, get_robot, 0),
             (_GetGoal, get_goal, -1),
             (_GetFeedback, get_feedback, 0),
-            (_GetVectorFeedback, get_vector_feedback, 0),
             (_SetControl, set_control, 0),
             (_GetControl, get_control, 0),
             (_GetLidar, get_lidar, 0),

@@ -101,21 +101,6 @@ public:
         return {first, second};
     }
 
-    pyrobo::VectorFeedback get_vector_feedback(std::string_view robot_id) const override {
-        require(callbacks_.get_vector_feedback, "get_vector_feedback");
-        const std::string id(robot_id);
-        double vx = 0.0;
-        double vy = 0.0;
-        double omega = 0.0;
-        check(
-            callbacks_.get_vector_feedback(
-                callbacks_.user_data, id.c_str(), &vx, &vy, &omega
-            ),
-            "get_vector_feedback"
-        );
-        return {vx, vy, omega};
-    }
-
     void set_control(double first, double second, std::string_view robot_id) override {
         require(callbacks_.set_control, "set_control");
         const std::string id(robot_id);

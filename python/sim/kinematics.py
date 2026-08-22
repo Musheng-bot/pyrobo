@@ -28,11 +28,6 @@ class Kinematics(ABC):
     def blocked_command(self, command: Command) -> Command:
         """发生碰撞时返回只允许保留的控制指令。"""
 
-    @abstractmethod
-    def feedback(self, command: Command) -> tuple[float, float, float]:
-        """将模型指令转换为统一的 ``(vx, vy, omega)`` 反馈。"""
-
-
 class HolonomicKinematics(Kinematics):
     """全向轮模型，指令为地图坐标系下的 ``(vx, vy)``。"""
 
@@ -59,7 +54,3 @@ class HolonomicKinematics(Kinematics):
 
     def blocked_command(self, command: Command) -> Command:
         return 0.0, 0.0
-
-    def feedback(self, command: Command) -> tuple[float, float, float]:
-        vx, vy = command
-        return vx, vy, 0.0

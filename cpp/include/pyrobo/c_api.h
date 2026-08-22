@@ -34,10 +34,6 @@ using pyrobo_callbacks = struct pyrobo_callbacks {
     int (*get_feedback)(
         void* user_data, const char* robot_id, double* first, double* second
     );
-    int (*get_vector_feedback)(
-        void* user_data, const char* robot_id, double* vx, double* vy,
-        double* omega
-    );
     int (*set_control)(
         void* user_data, const char* robot_id, double first, double second
     );
