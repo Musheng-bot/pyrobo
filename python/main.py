@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 
 from planner.navigation import nav_init, nav_run
+from sim.map import Map
 from sim.simulator import Simulator
 from sim.cpp_navigation import CppNavigation
 
@@ -129,10 +130,22 @@ def main() -> None:
     if not isinstance(map_config, dict) or "name" not in map_config:
         raise ValueError("config must define pyrobo.map.name")
 
-    map_file = find_map(str(map_config["name"]))
+    display_map_name = str(map_config["name"])
+    actual_map_name = str(map_config.get("real_name", display_map_name))
+    display_map_file = find_map(display_map_name)
+    actual_map_file = find_map(actual_map_name)
+    display_map = (
+        Map(
+            display_map_file,
+            resolution=float(map_config["resolution"]),
+            origin=(float(map_config["origin_x"]), float(map_config["origin_y"])),
+        )
+        if actual_map_name != display_map_name
+        else None
+    )
     sim = Simulator(
         time_step=float(pyrobo["time_step"]),
-        map_data=map_file,
+        map_data=actual_map_file,
         map_resolution=float(map_config["resolution"]),
         map_origin=(float(map_config["origin_x"]), float(map_config["origin_y"])),
         goal=goal,
@@ -144,6 +157,7 @@ def main() -> None:
         show_lidar=bool(display_config.get("show_lidar", True)),
         show_planning_map=bool(display_config.get("show_planning_map", False)),
     )
+    sim.set_display_map(display_map)
     sim.robot.reset(initial_pose)
 
     def manual_control(environment: Simulator) -> None:
@@ -155,7 +169,11 @@ def main() -> None:
         _ = feedback_vx, feedback_vy
 
     if mode == "auto":
-        cpp_navigation = None if args.python_navigation else CppNavigation(sim)
+        cpp_navigation = (
+            None
+            if args.python_navigation
+            else CppNavigation(sim, exposed_map=display_map)
+        )
         navigation_context = nav_init(sim) if args.python_navigation else None
 
         def auto_control(environment: Simulator) -> None:

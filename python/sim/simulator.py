@@ -96,6 +96,7 @@ class Simulator:
         self._draw_frame = 0
         self._lidar_display_points: dict[str, list[tuple[int, int]]] = {}
         self._display_path: list[WorldPoint] = []
+        self._display_map_override: Map | None = None
         self._planning_map: Map | None = None
         self._goal: tuple[float, float, float] | None = None
         self._goal_reached = False
@@ -224,11 +225,19 @@ class Simulator:
             raise TypeError("planning_map must be a Map or None")
         self._planning_map = planning_map
 
+    def set_display_map(self, display_map: Map | None) -> None:
+        """设置固定的显示地图，不影响碰撞检测、雷达或 C++ 地图数据。"""
+        if display_map is not None and not isinstance(display_map, Map):
+            raise TypeError("display_map must be a Map or None")
+        self._display_map_override = display_map
+
     def _display_map(self) -> Map:
         if self.map is None:
             raise RuntimeError("display requires map_data")
         if self.show_planning_map and self._planning_map is not None:
             return self._planning_map
+        if self._display_map_override is not None:
+            return self._display_map_override
         return self.map
 
     def get_display_path(self) -> list[WorldPoint]:
@@ -428,7 +437,10 @@ class Simulator:
         )
         for row in range(height):
             for column in range(width):
-                color = (242, 242, 242) if world_map.data[row, column] else (20, 20, 22)
+                value = int(world_map.display_data[row, column])
+                if value <= 1:
+                    value = 242 if world_map.data[row, column] else 20
+                color = (value, value, value)
                 pygame.draw.rect(
                     self._map_surface,
                     color,

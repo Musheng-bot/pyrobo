@@ -141,13 +141,23 @@ def find_library(build_dir: Path = DEFAULT_BUILD_DIR) -> Path:
 class CppNavigation:
     """Python-side owner of one C++ navigation context."""
 
-    def __init__(self, sim: Simulator, library_path: Path | None = None):
+    def __init__(
+        self,
+        sim: Simulator,
+        library_path: Path | None = None,
+        exposed_map: Map | None = None,
+    ):
         if sim.map is None:
             raise ValueError("C++ navigation requires a map")
+        if exposed_map is not None and not isinstance(exposed_map, Map):
+            raise TypeError("exposed_map must be a Map or None")
 
         self._sim = sim
         self._callback_error: str | None = None
-        self._map_data = sim.map.data.astype("uint8", copy=True, order="C")
+        map_for_cpp = exposed_map if exposed_map is not None else sim.map
+        self._map_data = map_for_cpp.data.astype("uint8", copy=True, order="C")
+        self._map_resolution = map_for_cpp.resolution
+        self._map_origin = map_for_cpp.origin
         self._callback_refs: list[Callable[..., object]] = []
         self._dll_directory = None
         if os.name == "nt" and hasattr(os, "add_dll_directory"):
@@ -208,8 +218,8 @@ class CppNavigation:
             data_size: ctypes.POINTER(ctypes.c_size_t),
         ) -> int:
             height[0], width[0] = self._map_data.shape
-            resolution[0] = self._sim.map.resolution
-            origin_x[0], origin_y[0] = self._sim.map.origin
+            resolution[0] = self._map_resolution
+            origin_x[0], origin_y[0] = self._map_origin
             data[0] = self._map_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
             data_size[0] = self._map_data.size
             return 1
@@ -300,7 +310,7 @@ class CppNavigation:
                 return 0
             values = np.ctypeslib.as_array(data, shape=(data_size,)).copy()
             planning_map = Map(
-                values.reshape((height, width)),
+                values.reshape((height, width)).astype(bool),
                 resolution=resolution,
                 origin=(origin_x, origin_y),
             )

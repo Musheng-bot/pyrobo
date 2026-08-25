@@ -46,6 +46,7 @@ class Map:
         if data.size == 0:
             raise ValueError("map must not be empty")
 
+        self.display_data = np.asarray(data, dtype=np.uint8).copy()
         self.data = (
             data.astype(bool, copy=True)
             if data.dtype == bool
