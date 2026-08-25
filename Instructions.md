@@ -8,13 +8,61 @@
 
 1. 请在[cpp/src/contestant.cpp](cpp/src/contestant.cpp)和[cpp/src/planner.cpp](cpp/src/planner.cpp)中完成代码，不需要，也不应该修改`python/`目录
 2. 如果需要，允许对cpp文件的实现进行一定的修改，包括`nav_init`和`nav_run`函数的流程等，但请注意不要随意修改接口，尽量只修改实现，否则可能导致程序运行失败
-3. 在拿到本仓库后，请首先在本目录下创建git仓库，然后将所有文件提交，形成第一个git提交
 
 ## 提交规范
 
-1. 提交时请附带你的`.git`文件夹，你需要使用`t<数字>`的`git tag`标注你完成题目时代码的状态。
-   eg. 你完成了第一题，确保代码功能正常后，你需要在此时提交代码，形成一个`commit`之后，在这个`commit`上附上一个`git tag`，tag名叫`t1`
-2. 在提交时，除了本项目内的文件，你应该自己创建一个`README.md`来对你的实现进行说明
+1. 完成每道题后，请在本仓库目录下分别创建 `ex1`、`ex2`、`ex3` 和 `ex4` 文件夹，并将本仓库的完整项目文件手动复制进去。
+2. 每个 `ex<n>` 都必须是一个可以独立运行的完整项目副本，不能只复制自己修改过的 C++ 文件。
+3. 最终只提交一个压缩包，例如 `submission.zip`。压缩包结构如下：
+   ```text
+   submission.zip
+   ├── README.md
+   ├── ex1/
+   ├── ex2/
+   ├── ex3/
+   └── ex4/
+   ```
+4. 每个 `ex<n>/` 文件夹内部都应包含完整项目文件，结构如下：
+   ```text
+   ex<n>/
+       ├── .clangd
+       ├── .editorconfig
+       ├── .envrc
+       ├── .gitattributes
+       ├── .gitignore
+       ├── build.bat
+       ├── build.sh
+       ├── Env.md
+       ├── Instructions.md
+       ├── run.bat
+       ├── run.sh
+       ├── config/
+       │   └── sim.yaml
+       ├── cpp/
+       │   ├── CMakeLists.txt
+       │   ├── include/pyrobo/
+       │   │   ├── c_api.h
+       │   │   ├── interface.hpp
+       │   │   └── planner.h
+       │   └── src/
+       │       ├── c_api.cpp
+       │       ├── contestant.cpp
+       │       └── planner.cpp
+       ├── exercises/
+       ├── map/
+       │   ├── map.png
+       │   └── unknown.png
+       └── python/
+           ├── ex.py
+           ├── main.py
+           ├── unknown.py
+           ├── planner/
+           ├── scripts/
+           └── sim/
+   ```
+5. 请复制项目中的隐藏文件，例如 `.clangd`、`.editorconfig`、`.gitattributes` 和 `.gitignore`。
+6. 不需要复制 `.git/`、`cpp/build/`、`build/`、`.cache/`、`.mypy_cache/`、`__pycache__/`、`.idea/` 和 `.vscode/` 等 Git 信息、构建产物和缓存目录。
+7. 压缩包根目录的 `README.md` 用于说明你的实现方法、每道题的完成情况以及运行方式，不需要在每个 `ex<n>/` 中重复创建 README。
 
 ## 项目基础知识说明
 
@@ -27,7 +75,6 @@
 7. 本项目默认起始点在左下角，终点在右上角，当小车中心点距离终点在`0.25m`以内时，会认为自己到达了终点
 8. 你可以在[配置文件](config/sim.yaml)里面修改一些仿真可视化相关的参数
 9.  你可以参考[环境配置说明](Env.md)来配置本仓库需要的环境
-10. 在构建前请确保本项目处在一个git仓库下，并且在python文件夹下没有任何未提交的内容。
 
 ## 地图查询和修改接口
 
@@ -248,3 +295,8 @@ Linux/macOS:
 你可以搜索文本 `Question 4` 来找到推荐的答题位置
 
 ---
+
+## 提醒
+
+1. 你的代码提交后需确保编译正常
+2. 出题人会使用不同的地图配置来检测你的算法，以评判分数

@@ -40,7 +40,6 @@ def run_build(
         str(build_dir),
         "--parallel",
         str(parallel),
-        "--skip-submission-check",
         "--scenario",
         scenario,
     ]
@@ -66,7 +65,6 @@ def start_process(
         python,
         str(RUN_SCRIPT),
         "--skip-build",
-        "--skip-submission-check",
         "--config",
         config,
         "--scenario",

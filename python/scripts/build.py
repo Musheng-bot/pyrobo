@@ -14,7 +14,6 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CPP_DIR = ROOT_DIR / "cpp"
 DEFAULT_BUILD_DIR = CPP_DIR / "build"
-CHECK_SCRIPT = ROOT_DIR / "python" / "scripts" / "check_submission.py"
 HOT_RELOAD_SCRIPT = ROOT_DIR / "python" / "scripts" / "hot_reload.py"
 
 
@@ -72,18 +71,6 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel build jobs.",
     )
     parser.add_argument(
-        "--skip-submission-check",
-        action="store_true",
-        help="Do not reject changes inside python/ before building.",
-    )
-    parser.add_argument(
-        "--base",
-        help=(
-            "Starter commit/tag/ref for the submission check. "
-            "Also catches committed non-C++ changes."
-        ),
-    )
-    parser.add_argument(
         "--watch",
         action="store_true",
         help="After building, start the simulator and rebuild when contestant.cpp changes.",
@@ -100,12 +87,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cmake = require_command("cmake")
-
-    if not args.skip_submission_check:
-        check_command = [sys.executable, str(CHECK_SCRIPT)]
-        if args.base:
-            check_command.extend(["--base", args.base])
-        run_command(check_command, ROOT_DIR)
 
     build_dir = args.build_dir
     if not build_dir.is_absolute():
