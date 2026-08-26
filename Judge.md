@@ -1,5 +1,17 @@
 # 评测规范
 
+运行评测器：
+
+```text
+python judge.py --submission submission.zip --cases cases --results results
+```
+
+只评测某一道题时：
+
+```text
+python judge.py --submission submission.zip --cases cases --results results --question 3
+```
+
 ## 一、测试用例
 
 一个 `case.yaml` 表示一次独立测试。每道题可以准备多个测试用例。
@@ -207,16 +219,25 @@ results/
 
 每个文件包含该题所有测试用例的结果：
 
+同一道题的所有 case 等权计算。单个 case 通过时记为 `1`，失败时记为 `0`：
+
+```text
+score = max_score * 通过的 case 数量 / case 总数
+```
+
+Q3 和 Q4 的运行轨迹可以额外保存在对应 case 目录下的 `trajectory.csv` 中，
+但评分只读取评测端直接计算出的指标，不读取答题代码生成的结果文件。
+
 ```json
 {
   "question": 3,
   "max_score": 30,
-  "score": 24,
+  "score": 30,
   "cases": [
     {
       "case": "case01",
       "passed": true,
-      "score": 24,
+      "score": 1,
       "metrics": {
         "control_success": true,
         "time_to_goal": 18.42,
