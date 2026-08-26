@@ -58,9 +58,7 @@ def stop_process(process: subprocess.Popen[bytes] | None) -> None:
         process.wait()
 
 
-def start_process(
-    python: str, config: str, python_navigation: bool, scenario: str
-) -> subprocess.Popen[bytes]:
+def start_process(python: str, config: str, scenario: str) -> subprocess.Popen[bytes]:
     command = [
         python,
         str(RUN_SCRIPT),
@@ -70,8 +68,6 @@ def start_process(
         "--scenario",
         scenario,
     ]
-    if python_navigation:
-        command.append("--python-navigation")
     print(f"+ {' '.join(command)}", flush=True)
     return subprocess.Popen(command, cwd=ROOT_DIR)
 
@@ -104,11 +100,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--interval", type=float, default=0.5, help="Polling interval in seconds.")
     parser.add_argument(
-        "--python-navigation",
-        action="store_true",
-        help="Run the reference Python navigation while testing the watcher.",
-    )
-    parser.add_argument(
         "--scenario",
         choices=("ex", "unknown"),
         default="ex",
@@ -129,9 +120,7 @@ def main() -> int:
     ):
         raise SystemExit("initial C++ build failed")
 
-    process = start_process(
-        sys.executable, args.config, args.python_navigation, args.scenario
-    )
+    process = start_process(sys.executable, args.config, args.scenario)
     last_snapshot = snapshot()
     try:
         while True:
@@ -152,9 +141,7 @@ def main() -> int:
                 args.parallel,
                 args.scenario,
             ):
-                process = start_process(
-                    sys.executable, args.config, args.python_navigation, args.scenario
-                )
+                process = start_process(sys.executable, args.config, args.scenario)
             else:
                 print("build failed; waiting for the next source change", flush=True)
     except KeyboardInterrupt:

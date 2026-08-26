@@ -5,7 +5,6 @@ from typing import Any
 
 import yaml
 
-from planner.navigation import nav_init, nav_run
 from sim.map import Map
 from sim.simulator import Simulator
 from sim.cpp_navigation import CppNavigation
@@ -96,9 +95,9 @@ def get_robot_config(config: dict[str, Any]) -> tuple[tuple[float, float, float]
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the PyRobo simulator.")
     parser.add_argument(
-        "--python-navigation",
+        "--display",
         action="store_true",
-        help="Use the reference Python navigation instead of the compiled C++ answer.",
+        help="Only display the simulator; do not build, plan, or control the robot.",
     )
     parser.add_argument(
         "--scenario",
@@ -168,19 +167,14 @@ def main() -> None:
         feedback_vx, feedback_vy = environment.get_feedback()
         _ = feedback_vx, feedback_vy
 
-    if mode == "auto":
-        cpp_navigation = (
-            None
-            if args.python_navigation
-            else CppNavigation(sim, exposed_map=display_map)
-        )
-        navigation_context = nav_init(sim) if args.python_navigation else None
+    cpp_navigation = None
+    if args.display:
+        callback = None
+    elif mode == "auto":
+        cpp_navigation = CppNavigation(sim, exposed_map=display_map)
 
         def auto_control(environment: Simulator) -> None:
-            if cpp_navigation is not None:
-                cpp_navigation.run()
-            else:
-                nav_run(environment, navigation_context)
+            cpp_navigation.run()
 
         callback = auto_control
     else:
@@ -188,7 +182,7 @@ def main() -> None:
     try:
         sim.run(callback=callback)
     finally:
-        if mode == "auto" and cpp_navigation is not None:
+        if cpp_navigation is not None:
             cpp_navigation.close()
 
 

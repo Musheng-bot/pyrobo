@@ -572,29 +572,51 @@ class Simulator:
         # Keep grid lines as a low-contrast visual aid instead of the main map.
         screen.blit(self._grid_layer, (0, 0))
 
+        if self._goal is not None:
+            goal_screen = self._world_to_screen(self._goal[:2])
+            goal_label = self._font.render("GOAL", True, (120, 255, 150))
+            screen.blit(goal_label, (goal_screen[0] + 12, goal_screen[1] - 12))
+        for robot_id, robot in self.robots.items():
+            robot_screen = self._world_to_screen(robot.pose[:2])
+            robot_label = self._font.render(robot_id.upper(), True, (255, 130, 130))
+            screen.blit(robot_label, (robot_screen[0] + 12, robot_screen[1] - 12))
+
         panel_x = width * cell
         pygame.draw.rect(screen, (35, 40, 48), (panel_x, 0, 280, screen.get_height()))
         x, y, yaw = self.robot.pose
-        expected_vx, expected_vy = self.get_control()
-        feedback_vx, feedback_vy = self.get_feedback()
+        robot_column, robot_row = world_map.world_to_grid(x, y)
+        goal_lines = []
+        if self._goal is not None:
+            goal_x, goal_y, goal_yaw = self._goal
+            goal_column, goal_row = world_map.world_to_grid(goal_x, goal_y)
+            goal_lines = [
+                "",
+                "GOAL (green)",
+                f"map x: {goal_x:.3f} m",
+                f"map y: {goal_y:.3f} m",
+                f"grid column: {goal_column}",
+                f"grid row: {goal_row}",
+                f"goal yaw: {goal_yaw:.3f} rad",
+            ]
         lines = [
-            "PYROBO SIMULATOR",
+            "PYROBO DISPLAY",
+            "mode: display only",
             "",
-            f"resolution: {world_map.resolution:.3f} m/pixel",
-            f"map size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
-            f"robots: {len(self.robots)}",
+            "DISPLAY MAP",
+            f"resolution: {world_map.resolution:.3f} m/cell",
+            f"size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
             "",
-            f"pose x: {x:.3f} m",
-            f"pose y: {y:.3f} m",
-            f"pose yaw: {self.robot.pose[2]:.3f} rad",
+            "ROBOT (red)",
+            f"map x: {x:.3f} m",
+            f"map y: {y:.3f} m",
+            f"grid column: {robot_column}",
+            f"grid row: {robot_row}",
+            f"yaw: {yaw:.3f} rad",
+            f"radius: {self.robot.radius:.3f} m",
+            *goal_lines,
             "",
-            f"command vx: {expected_vx:.3f} m/s",
-            f"command vy: {expected_vy:.3f} m/s",
-            f"feedback vx: {feedback_vx:.3f} m/s",
-            f"feedback vy: {feedback_vy:.3f} m/s",
-            f"path points: {len(self._display_path)}",
-            "",
-            "WASD: move",
+            "planning: disabled",
+            "control: disabled",
             "ESC  close",
         ]
         for index, line in enumerate(lines):

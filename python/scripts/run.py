@@ -32,9 +32,9 @@ def parse_args() -> argparse.Namespace:
         help="Start the simulator without compiling the C++ interface first.",
     )
     parser.add_argument(
-        "--python-navigation",
+        "--display",
         action="store_true",
-        help="Use the reference Python navigation instead of the compiled C++ answer.",
+        help="Only display the simulator; do not build, plan, or control the robot.",
     )
     parser.add_argument(
         "--scenario",
@@ -64,15 +64,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    if not args.skip_build:
+    if not args.skip_build and not args.display:
         build_command = [args.python, str(BUILD_SCRIPT), "--config", args.config]
         if args.clean:
             build_command.append("--clean")
         run_command(build_command, ROOT_DIR)
 
     main_command = [args.python, str(MAIN_SCRIPT)]
-    if args.python_navigation:
-        main_command.append("--python-navigation")
+    if args.display:
+        main_command.append("--display")
     main_command.extend(["--scenario", args.scenario])
     run_command(main_command, ROOT_DIR)
     return 0
