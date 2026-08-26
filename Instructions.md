@@ -30,8 +30,6 @@
        ├── .envrc
        ├── .gitattributes
        ├── .gitignore
-       ├── build.bat
-       ├── build.sh
        ├── Env.md
        ├── Instructions.md
        ├── run.bat
@@ -275,7 +273,7 @@ Linux/macOS:
 
 ---
 
-### Bonus
+### 第四题
 
 新的地图出现了，但是小明很粗心，不小心在它上面滴了一点墨水，好在墨水不是黑色的，它在地图上不黑不白的，你可以靠自己的雷达探测它的缺口在哪里！
 
