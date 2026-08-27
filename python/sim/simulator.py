@@ -49,6 +49,7 @@ class Simulator:
         show_planning_map: bool = False,
         window_scale: int | None = None,
         goal: tuple[float, float] | tuple[float, float, float] | None = None,
+        display_only: bool = False,
     ):
         """创建仿真环境。
 
@@ -85,6 +86,7 @@ class Simulator:
         self.render_enabled = render
         self.show_lidar = bool(show_lidar)
         self.show_planning_map = bool(show_planning_map)
+        self.display_only = bool(display_only)
         self.window_scale = window_scale
         self.is_running = False
         self._pygame = None
@@ -598,27 +600,55 @@ class Simulator:
                 f"grid row: {goal_row}",
                 f"goal yaw: {goal_yaw:.3f} rad",
             ]
-        lines = [
-            "PYROBO DISPLAY",
-            "mode: display only",
-            "",
-            "DISPLAY MAP",
-            f"resolution: {world_map.resolution:.3f} m/cell",
-            f"size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
-            "",
-            "ROBOT (red)",
-            f"map x: {x:.3f} m",
-            f"map y: {y:.3f} m",
-            f"grid column: {robot_column}",
-            f"grid row: {robot_row}",
-            f"yaw: {yaw:.3f} rad",
-            f"radius: {self.robot.radius:.3f} m",
-            *goal_lines,
-            "",
-            "planning: disabled",
-            "control: disabled",
-            "ESC  close",
-        ]
+        if self.display_only:
+            lines = [
+                "PYROBO DISPLAY",
+                "mode: display only",
+                "",
+                "DISPLAY MAP",
+                f"resolution: {world_map.resolution:.3f} m/cell",
+                f"size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
+                "",
+                "ROBOT (red)",
+                f"map x: {x:.3f} m",
+                f"map y: {y:.3f} m",
+                f"grid column: {robot_column}",
+                f"grid row: {robot_row}",
+                f"yaw: {yaw:.3f} rad",
+                f"radius: {self.robot.radius:.3f} m",
+                *goal_lines,
+                "",
+                "planning: disabled",
+                "control: disabled",
+                "ESC  close",
+            ]
+        else:
+            expected_vx, expected_vy = self.get_control()
+            feedback_vx, feedback_vy = self.get_feedback()
+            lines = [
+                "PYROBO SIMULATOR",
+                "mode: active",
+                "",
+                "MAP",
+                f"resolution: {world_map.resolution:.3f} m/cell",
+                f"size: {world_map.size_meters[0]:.2f} x {world_map.size_meters[1]:.2f} m",
+                "",
+                "ROBOT (red)",
+                f"map x: {x:.3f} m",
+                f"map y: {y:.3f} m",
+                f"grid column: {robot_column}",
+                f"grid row: {robot_row}",
+                f"yaw: {yaw:.3f} rad",
+                f"radius: {self.robot.radius:.3f} m",
+                *goal_lines,
+                "",
+                f"command vx: {expected_vx:.3f} m/s",
+                f"command vy: {expected_vy:.3f} m/s",
+                f"feedback vx: {feedback_vx:.3f} m/s",
+                f"feedback vy: {feedback_vy:.3f} m/s",
+                f"path points: {len(self._display_path)}",
+                "ESC  close",
+            ]
         for index, line in enumerate(lines):
             color = (255, 220, 120) if index == 0 else (235, 235, 235)
             screen.blit(self._font.render(line, True, color), (panel_x + 18, 18 + index * 24))

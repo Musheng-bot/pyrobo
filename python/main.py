@@ -155,6 +155,7 @@ def main() -> None:
         render=True,
         show_lidar=bool(display_config.get("show_lidar", True)),
         show_planning_map=bool(display_config.get("show_planning_map", False)),
+        display_only=args.display,
     )
     sim.set_display_map(display_map)
     sim.robot.reset(initial_pose)
