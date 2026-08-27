@@ -513,7 +513,7 @@ class Simulator:
             pygame.draw.circle(screen, (40, 120, 230), self._world_to_screen(point), 4)
 
         if self._goal is not None:
-            pygame.draw.circle(screen, (40, 220, 90), self._world_to_screen(self._goal[:2]), 10, 4)
+            pygame.draw.circle(screen, (255, 140, 0), self._world_to_screen(self._goal[:2]), 5)
 
         map_width_m, map_height_m = world_map.size_meters
         lidar_count = 360
@@ -574,7 +574,7 @@ class Simulator:
 
         if self._goal is not None:
             goal_screen = self._world_to_screen(self._goal[:2])
-            goal_label = self._font.render("GOAL", True, (120, 255, 150))
+            goal_label = self._font.render("GOAL", True, (255, 140, 0))
             screen.blit(goal_label, (goal_screen[0] + 12, goal_screen[1] - 12))
         for robot_id, robot in self.robots.items():
             robot_screen = self._world_to_screen(robot.pose[:2])
@@ -591,7 +591,7 @@ class Simulator:
             goal_column, goal_row = world_map.world_to_grid(goal_x, goal_y)
             goal_lines = [
                 "",
-                "GOAL (green)",
+                "GOAL (orange)",
                 f"map x: {goal_x:.3f} m",
                 f"map y: {goal_y:.3f} m",
                 f"grid column: {goal_column}",
@@ -630,7 +630,7 @@ class Simulator:
             screen.blit(overlay, (0, 0))
             message_font = self._load_message_font(pygame, 48)
             detail_font = self._load_message_font(pygame, 24)
-            message = message_font.render("到达终点", True, (120, 255, 150))
+            message = message_font.render("到达终点", True, (255, 140, 0))
             detail = detail_font.render(
                 f"程序将在 {remaining} 秒后关闭", True, (255, 255, 255)
             )

@@ -87,6 +87,13 @@ Linux/macOS：
 ./run.sh
 ```
 
+如果只想查看仿真界面：
+
+```text
+Windows:   run.bat --display
+Linux/macOS: ./run.sh --display
+```
+
 运行未知地图场景：
 
 ```text
@@ -94,9 +101,3 @@ Windows:   run.bat --scenario unknown
 Linux/macOS: ./run.sh --scenario unknown
 ```
 
-如果只想查看仿真界面，不构建 C++、不规划路径、也不设置控制量：
-
-```text
-Windows:   run.bat --display
-Linux/macOS: ./run.sh --display
-```
